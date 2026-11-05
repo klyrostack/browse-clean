@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrowseClean</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <span class="brand-title">BrowseClean</span>
+        <span class="brand-version">v1.0.0</span>
+      </div>
+      <button id="openOptionsBtn" class="icon-btn" title="Settings" aria-label="Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Domain Card -->
+    <div class="domain-card">
+      <div class="domain-info">
+        <span class="domain-name" id="currentDomain">Loading...</span>
+        <span class="domain-status" id="domainStatus">Active</span>
+      </div>
+      <label class="switch" title="Toggle filtering on this domain">
+        <input type="checkbox" id="siteToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Statistics -->
+    <div class="metrics">
+      <div class="metric-item">
+        <span class="metric-value" id="pageCount">0</span>
+        <span class="metric-label">Blocked on page</span>
+      </div>
+      <div class="metric-divider"></div>
+      <div class="metric-item">
+        <span class="metric-value" id="totalCount">0</span>
+        <span class="metric-label">All-time blocked</span>
+      </div>
+    </div>
+
+    <!-- Primary Action -->
+    <button id="manualSweepBtn" class="action-btn">
+      Sweep Page Elements
+    </button>
+
+    <!-- Filters -->
+    <div class="filter-section">
+      <div class="section-title">Rules</div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Cookie Banners & CMPs</span>
+          <span class="filter-desc">Auto-rejects and collapses consent modals</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleCookies" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Newsletter & Promo Overlays</span>
+          <span class="filter-desc">Suppresses lead-capture dialogs</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleNewsletters" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Chat & Support Widgets</span>
+          <span class="filter-desc">Hides persistent customer chat bubbles</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleChats" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Scroll Lock Recovery</span>
+          <span class="filter-desc">Removes modal-induced document overflow locks</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleScroll" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Autoplay Videos</span>
+          <span class="filter-desc">Prevents background video auto-playback</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleAutoplay" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Surveys & Feedback</span>
+          <span class="filter-desc">Suppresses on-screen feedback prompts</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleSurveys" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
