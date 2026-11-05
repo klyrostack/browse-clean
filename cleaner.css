@@ -1,0 +1,159 @@
+/**
+ * BrowseClean - Zero-FOUC Declarative Clutter Filter
+ * Injected at document_start to prevent banners, popups, and veils
+ * from rendering before JavaScript even executes.
+ */
+
+/* ==========================================================================
+   1. COOKIE CONSENT WALLS & CMPs (Sourcepoint, OneTrust, Cookiebot, etc.)
+   ========================================================================== */
+div[id^="sp_message_container"],
+div[id*="sp_message_container"],
+div[class^="sp_message_container"],
+iframe[id^="sp_message_iframe"],
+iframe[id*="sp_message_iframe"],
+iframe[src*="sourcepoint"],
+.sp_veil,
+div[class*="sp_veil"],
+#onetrust-consent-sdk,
+#onetrust-banner-sdk,
+.onetrust-pc-dark-filter,
+#onetrust-policy,
+.ot-floating-button,
+#CybotCookiebotDialog,
+#CybotCookiebotDialogBodyUnderlay,
+#CookiebotWidget,
+#didomi-host,
+.didomi-popup-container,
+.didomi-popup-backdrop,
+.didomi-consent-popup-actions,
+#usercentrics-root,
+div[data-testid="uc-overlay"],
+div[data-testid="uc-banner"],
+#qc-cmp2-container,
+#qc-cmp2-main,
+.qc-cmp2-summary-section,
+.fc-ab-root,
+.fc-consent-root,
+.fc-dialog-overlay,
+.truste_box_overlay,
+.truste_overlay,
+#truste-consent-track,
+.cky-consent-container,
+.cky-overlay,
+.cky-btn-revisit-wrapper,
+[id*="axeptio"],
+[class*="axeptio"],
+#klaro,
+.klaro .cookie-notice,
+.klaro .cookie-modal,
+#cookie-notice,
+#cookie-banner,
+#cookiebanner,
+#cookieConsent,
+#cookie-law-info-bar,
+.cc-banner,
+.cc-window,
+.cookie-banner,
+.cookie-consent,
+.cookie-popup,
+.consent-banner,
+.cmp-container,
+div[id^="cmp-"],
+div[class*="cmp-"],
+.osano-cm-window,
+div[aria-label*="cookie consent" i],
+div[aria-label*="cookie policy" i],
+div[id*="consent-layer" i],
+div[class*="consent-layer" i] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  z-index: -99999 !important;
+}
+
+/* ==========================================================================
+   2. FLOATING CHAT WIDGETS (Intercom, Drift, Zendesk, Crisp, etc.)
+   ========================================================================== */
+#intercom-container,
+#intercom-frame,
+.intercom-lightweight-app,
+.intercom-app,
+#drift-widget,
+#drift-frame-controller,
+iframe[title="Drift" i],
+#launcher,
+#webWidget,
+iframe[id="webWidget"],
+div[data-testid="chat-widget"],
+.crisp-client,
+#crisp-chatbox,
+#tawk-bubble-container,
+#tawk-chat-frame,
+div[class*="tawk-min-container"],
+#hubspot-messages-iframe-container,
+#chat-widget-container,
+div[class*="livechat" i],
+#freshworks-container,
+#fc_frame,
+.zohosalesiq,
+#zsiq_float,
+iframe#gorgias-chat-container,
+#chatra:not(.chatra--expanded),
+div[id^="help-scout-beacon"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ==========================================================================
+   3. PROMOTIONAL POPUPS, NEWSLETTER MODALS & LOGIN WALLS
+   ========================================================================== */
+#desktop-dynamic-upsell-dialog,
+.desktop-dynamic-upsell-dialog,
+div[id^="om-"],
+div[class*="om-holder"],
+#privy-container,
+.privy-overlay,
+.klaviyo-form,
+div[data-testid*="klaviyo" i],
+.sumo-popup,
+.sumome-popup,
+div[id*="justuno" i],
+div[id*="sleeknote" i],
+.upsell-modal,
+div[class*="newsletter-modal" i],
+div[class*="subscribe-modal" i],
+div[id*="newsletter-popup" i],
+div[class*="email-signup" i][style*="fixed"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ==========================================================================
+   4. ANTI-SCROLL-LOCK ENFORCEMENT
+   Prevent websites from freezing scrolling when a modal is suppressed
+   ========================================================================== */
+html.sp-message-open,
+body.sp-message-open,
+html.didomi-popup-open,
+body.didomi-popup-open,
+html.modal-open,
+body.modal-open,
+html[style*="overflow: hidden"],
+body[style*="overflow: hidden"],
+html[style*="overflow-y: hidden"],
+body[style*="overflow-y: hidden"] {
+  overflow: auto !important;
+  overflow-y: auto !important;
+  position: static !important;
+  height: auto !important;
+  touch-action: auto !important;
+}
