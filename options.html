@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrowseClean Preferences</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="brand-name">BrowseClean</span>
+        <span class="brand-role">Settings</span>
+      </div>
+      <nav class="nav">
+        <button class="nav-link active" data-tab="general">Modules</button>
+        <button class="nav-link" data-tab="whitelist">Whitelist</button>
+        <button class="nav-link" data-tab="custom-rules">Custom Selectors</button>
+        <button class="nav-link" data-tab="backup">Data Management</button>
+      </nav>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+      <!-- Tab 1: General Modules -->
+      <section id="tab-general" class="pane active">
+        <div class="pane-header">
+          <h1>Protection Modules</h1>
+          <p class="subtitle">Configure automated DOM filtering and suppression rules.</p>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Cookie Banners & CMPs</span>
+              <span class="row-desc">Automatically declines or collapses Sourcepoint, OneTrust, Cookiebot, and other consent frameworks.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-cookies" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Newsletter & Promo Overlays</span>
+              <span class="row-desc">Suppresses fullscreen email subscription dialogs and lead capture popups.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-newsletters" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Live Chat Widgets</span>
+              <span class="row-desc">Hides persistent customer support and sales chat bubbles (Intercom, Drift, Zendesk, Crisp).</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-chats" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Scroll Lock Recovery</span>
+              <span class="row-desc">Restores document body scrolling when a suppressed modal attempts to freeze the page viewport.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-scroll" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Autoplay Video Blocker</span>
+              <span class="row-desc">Prevents background videos from auto-playing sound and video without user gesture.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-autoplay" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Survey & Feedback Prompts</span>
+              <span class="row-desc">Suppresses Hotjar, Qualtrics, and on-screen NPS survey prompts.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-surveys" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: Whitelist -->
+      <section id="tab-whitelist" class="pane">
+        <div class="pane-header">
+          <h1>Domain Whitelist</h1>
+          <p class="subtitle">Domains where BrowseClean is completely inactive. Use this for trusted platforms, internal portals, or sites where popups are required.</p>
+        </div>
+
+        <div class="card">
+          <div class="input-row">
+            <input type="text" id="whitelistInput" placeholder="domain.com (e.g. github.com, banking.com)">
+            <button id="addWhitelistBtn" class="btn btn-primary">Add Domain</button>
+          </div>
+
+          <ul id="whitelistUl" class="list">
+            <!-- Populated via JS -->
+          </ul>
+        </div>
+      </section>
+
+      <!-- Tab 3: Custom Selectors -->
+      <section id="tab-custom-rules" class="pane">
+        <div class="pane-header">
+          <h1>Custom CSS Selectors</h1>
+          <p class="subtitle">Target and hide specific persistent layout annoyances that general heuristics do not catch.</p>
+        </div>
+
+        <div class="card">
+          <div class="grid-row">
+            <input type="text" id="ruleDomainInput" placeholder="Domain (optional, leave blank for global)">
+            <input type="text" id="ruleSelectorInput" placeholder="CSS selector (e.g. .sticky-banner, #promo-header)">
+            <button id="addRuleBtn" class="btn btn-primary">Add Rule</button>
+          </div>
+
+          <ul id="rulesUl" class="list">
+            <!-- Populated via JS -->
+          </ul>
+        </div>
+      </section>
+
+      <!-- Tab 4: Backup & Reset -->
+      <section id="tab-backup" class="pane">
+        <div class="pane-header">
+          <h1>Data Management</h1>
+          <p class="subtitle">Backup configuration preferences or restore factory state.</p>
+        </div>
+
+        <div class="card">
+          <div class="action-row">
+            <div>
+              <span class="action-title">Export Preferences</span>
+              <p class="action-desc">Save your whitelist, custom rules, and module settings to a JSON file.</p>
+            </div>
+            <button id="exportBtn" class="btn btn-secondary">Export JSON</button>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Import Preferences</span>
+              <p class="action-desc">Restore settings from an existing configuration file.</p>
+            </div>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+            <button id="importBtn" class="btn btn-secondary">Import JSON</button>
+          </div>
+
+          <div class="action-row danger">
+            <div>
+              <span class="action-title">Reset to Defaults</span>
+              <p class="action-desc">Clears all telemetry counters, whitelists, and custom rules.</p>
+            </div>
+            <button id="resetBtn" class="btn btn-danger">Reset Configuration</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
