@@ -161,10 +161,16 @@ body {
   background-color: var(--border-subtle);
 }
 
-/* Action Button */
+/* Actions Grid */
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .action-btn {
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 10px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
@@ -172,7 +178,9 @@ body {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
+  text-align: center;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .action-btn:hover {
@@ -184,6 +192,16 @@ body {
   transform: translateY(1px);
 }
 
+.action-zapper {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #F87171;
+}
+
+.action-zapper:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: #EF4444;
+}
+
 /* Filter Rules Section */
 .filter-section {
   display: flex;
@@ -193,6 +211,8 @@ body {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .section-title {
@@ -220,6 +240,7 @@ body {
 .filter-meta {
   display: flex;
   flex-direction: column;
+  max-width: 230px;
 }
 
 .filter-name {
