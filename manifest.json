@@ -3,7 +3,7 @@
   "name": "BrowseClean — Universal Web Declutterer",
   "short_name": "BrowseClean",
   "description": "Production-grade declutter engine that eliminates cookie consent walls, newsletter popups, live chat widgets, and scroll-locks.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "permissions": [
     "storage",
     "activeTab",
@@ -25,6 +25,15 @@
       "all_frames": true
     }
   ],
+  "commands": {
+    "toggle-zapper": {
+      "suggested_key": {
+        "default": "Alt+Z",
+        "mac": "Alt+Z"
+      },
+      "description": "Activate Element Zapper"
+    }
+  },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
