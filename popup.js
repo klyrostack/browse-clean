@@ -9,11 +9,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const pageCountEl = document.getElementById('pageCount');
   const totalCountEl = document.getElementById('totalCount');
   const manualSweepBtn = document.getElementById('manualSweepBtn');
+  const startZapperBtn = document.getElementById('startZapperBtn');
   const openOptionsBtn = document.getElementById('openOptionsBtn');
 
   const toggleCookies = document.getElementById('toggleCookies');
   const toggleNewsletters = document.getElementById('toggleNewsletters');
   const toggleChats = document.getElementById('toggleChats');
+  const toggleUnblur = document.getElementById('toggleUnblur');
+  const toggleCopy = document.getElementById('toggleCopy');
+  const toggleCleanUrls = document.getElementById('toggleCleanUrls');
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
@@ -28,6 +32,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     stopAutoplay: true,
     blockNotifications: true,
     blockSurveys: true,
+    unblurContent: true,
+    unlockCopy: true,
+    cleanUrls: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -44,6 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         currentDomainEl.textContent = 'System Page';
         siteToggle.disabled = true;
+        if (startZapperBtn) startZapperBtn.disabled = true;
       }
     } catch (e) {
       currentDomainEl.textContent = 'Unknown Page';
@@ -60,6 +68,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleCookies.checked = !!activeSettings.blockCookies;
     toggleNewsletters.checked = !!activeSettings.blockNewsletters;
     toggleChats.checked = !!activeSettings.blockChats;
+    toggleUnblur.checked = !!activeSettings.unblurContent;
+    toggleCopy.checked = !!activeSettings.unlockCopy;
+    toggleCleanUrls.checked = !!activeSettings.cleanUrls;
     toggleScroll.checked = !!activeSettings.restoreScroll;
     toggleAutoplay.checked = !!activeSettings.stopAutoplay;
     toggleSurveys.checked = !!activeSettings.blockSurveys;
@@ -133,6 +144,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   toggleCookies.addEventListener('change', () => { activeSettings.blockCookies = toggleCookies.checked; persistSettings(); });
   toggleNewsletters.addEventListener('change', () => { activeSettings.blockNewsletters = toggleNewsletters.checked; persistSettings(); });
   toggleChats.addEventListener('change', () => { activeSettings.blockChats = toggleChats.checked; persistSettings(); });
+  toggleUnblur.addEventListener('change', () => { activeSettings.unblurContent = toggleUnblur.checked; persistSettings(); });
+  toggleCopy.addEventListener('change', () => { activeSettings.unlockCopy = toggleCopy.checked; persistSettings(); });
+  toggleCleanUrls.addEventListener('change', () => { activeSettings.cleanUrls = toggleCleanUrls.checked; persistSettings(); });
   toggleScroll.addEventListener('change', () => { activeSettings.restoreScroll = toggleScroll.checked; persistSettings(); });
   toggleAutoplay.addEventListener('change', () => { activeSettings.stopAutoplay = toggleAutoplay.checked; persistSettings(); });
   toggleSurveys.addEventListener('change', () => { activeSettings.blockSurveys = toggleSurveys.checked; persistSettings(); });
@@ -154,6 +168,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 1200);
       }, 200);
     });
+  });
+
+  // Start Zapper
+  startZapperBtn.addEventListener('click', () => {
+    if (!activeTab || !activeTab.id) return;
+    chrome.tabs.sendMessage(activeTab.id, { action: 'startZapper' });
+    window.close(); // Close popup window so user can click elements on page directly
   });
 
   // Settings
