@@ -11,6 +11,9 @@ const DEFAULT_SETTINGS = {
   stopAutoplay: true,
   blockNotifications: true,
   blockSurveys: true,
+  unblurContent: true,
+  unlockCopy: true,
+  cleanUrls: true,
   whitelistedDomains: [],
   customSelectors: []
 };
@@ -20,6 +23,10 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(['settings', 'stats'], (result) => {
     if (!result.settings) {
       chrome.storage.local.set({ settings: DEFAULT_SETTINGS });
+    } else {
+      // Migrate missing fields if updating
+      const updated = Object.assign({}, DEFAULT_SETTINGS, result.settings);
+      chrome.storage.local.set({ settings: updated });
     }
     if (!result.stats) {
       chrome.storage.local.set({
@@ -31,7 +38,18 @@ chrome.runtime.onInstalled.addListener(() => {
     }
   });
 
-  chrome.action.setBadgeBackgroundColor({ color: '#6366F1' });
+  chrome.action.setBadgeBackgroundColor({ color: '#3B82F6' });
+});
+
+// Shortcut commands listener (e.g. Alt+Z for Element Zapper)
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'toggle-zapper') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs && tabs[0] && tabs[0].id) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'startZapper' }).catch(() => {});
+      }
+    });
+  }
 });
 
 // Telemetry & Badge Synchronization
@@ -47,7 +65,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       chrome.action.setBadgeBackgroundColor({
         tabId: tabId,
-        color: '#6366F1'
+        color: '#3B82F6'
       });
     }
 
