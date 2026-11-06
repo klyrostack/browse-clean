@@ -20,6 +20,10 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Cookie Consent Walls (CMPs)**: Sourcepoint, OneTrust, Cookiebot, Didomi, Usercentrics, Quantcast Choice, Google Funding Choices, TrustArc, Axeptio, CookieYes, Klaro.
 * **Lead-Gen & Newsletter Modals**: Klaviyo, Privy, OptinMonster, Sumo, Sleeknote, Reddit desktop app upsells.
 * **Customer Chat SDKs**: Intercom, Drift, Zendesk / Zopim, Crisp, Tawk.to, HubSpot, Freshchat, Zoho SalesIQ.
+* **Soft-Paywall Unblurrer**: Removes artificial CSS `filter: blur()`, height constraints, and gradient fade-out overlays on articles.
+* **Universal Selection & Right-Click Unlocker**: Bypasses contextmenu blocking, re-enables text selection, and prevents clipboard tracking hijacking.
+* **URL Tracker Cleaner**: Strips `utm_*`, `fbclid`, `gclid`, `si`, and other tracking parameters automatically when copying links.
+* **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
 * **Scroll Traps**: Clears inline `overflow: hidden`, `position: fixed`, and modal lock classes (`sp-message-open`, `modal-open`, `overflow-hidden`).
 * **Autoplay Media**: Pauses unprompted background video playback.
 
