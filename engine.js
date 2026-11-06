@@ -1,6 +1,7 @@
 /**
  * BrowseClean - Core Content Engine (Production Grade)
- * Ultra-fast, zero-overhead DOM declutter and consent automation.
+ * Ultra-fast, zero-overhead DOM declutter, consent automation,
+ * anti-paywall unblurring, selection unlocker, URL sanitizer, and element zapper.
  * Injected at document_start in all frames.
  */
 
@@ -14,6 +15,7 @@
   const currentHostname = (window.location && window.location.hostname) ? window.location.hostname.toLowerCase() : '';
   let isCleanActive = true;
   let blockedCount = 0;
+  let isZapperActive = false;
 
   // Configuration schema
   let config = {
@@ -24,6 +26,9 @@
     stopAutoplay: true,
     blockNotifications: true,
     blockSurveys: true,
+    unblurContent: true,
+    unlockCopy: true,
+    cleanUrls: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -76,6 +81,13 @@
     'weigeren',
     'rejeitar todos',
     'rejeitar'
+  ];
+
+  // Common tracking query parameters to sanitize
+  const TRACKING_PARAMS = [
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+    'fbclid', 'gclid', 'msclkid', 'mc_eid', 'si', 'ref', 'ref_', 'tracking_id',
+    'igshid', 'share_id', '_hsenc', '_hsmi', 'mkt_tok'
   ];
 
   // Specific CMP root and container selectors
@@ -226,7 +238,6 @@
   function sweepCookieWalls() {
     if (!config.blockCookies) return;
 
-    // A. Smart Reject Button Hunter
     try {
       const candidates = document.querySelectorAll('button, [role="button"], a.button, input[type="button"]');
       candidates.forEach(btn => {
@@ -255,17 +266,13 @@
       });
     } catch (e) {}
 
-    // B. Selectors sweep
     CMP_CONTAINERS.forEach(selector => {
       try {
         const matches = document.querySelectorAll(selector);
-        matches.forEach(el => {
-          eradicateElement(el, 'cookie-cmp');
-        });
+        matches.forEach(el => eradicateElement(el, 'cookie-cmp'));
       } catch (e) {}
     });
 
-    // C. Remove any orphaned veils or backdrops
     try {
       const backdrops = document.querySelectorAll('.sp_veil, div[class*="sp_veil"], div[id*="sp_veil"], div[class*="ot-fade-in"], div[class*="cookie-backdrop"]');
       backdrops.forEach(b => eradicateElement(b, 'veil'));
@@ -304,11 +311,9 @@
   function sweepNewsletterModals() {
     if (!config.blockNewsletters) return;
 
-    // Specific promo selectors
     const promos = document.querySelectorAll('#desktop-dynamic-upsell-dialog, .desktop-dynamic-upsell-dialog, div[id^="om-"], div[class*="om-holder"], #privy-container, .klaviyo-form, .sumo-popup, .upsell-modal');
     promos.forEach(p => eradicateElement(p, 'promo'));
 
-    // Heuristic scan for modals containing email inputs
     try {
       const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email" i], input[placeholder*="email" i]');
       emailInputs.forEach(input => {
@@ -320,7 +325,6 @@
           if (isModal) {
             const txt = (parent.innerText || '').toLowerCase();
             if (txt.includes('newsletter') || txt.includes('subscribe') || txt.includes('sign up') || txt.includes('discount') || txt.includes('% off')) {
-              // Also eradicate its backdrop
               const prev = parent.previousElementSibling;
               if (prev && window.getComputedStyle(prev).position === 'fixed') {
                 eradicateElement(prev, 'backdrop');
@@ -338,7 +342,124 @@
   }
 
   /**
-   * 5. Custom User Selectors
+   * 5. Unblur Content & Soft-Paywall Breaker
+   */
+  function sweepPaywallBlurs() {
+    if (!config.unblurContent) return;
+
+    try {
+      // 1. Remove inline/class blur filters
+      const blurred = document.querySelectorAll('[style*="blur("], [class*="blur"]');
+      blurred.forEach(el => {
+        const style = window.getComputedStyle(el);
+        if (style.filter && style.filter.includes('blur')) {
+          el.style.setProperty('filter', 'none', 'important');
+          el.style.setProperty('-webkit-filter', 'none', 'important');
+          el.style.setProperty('backdrop-filter', 'none', 'important');
+          el.style.setProperty('user-select', 'text', 'important');
+        }
+      });
+
+      // 2. Uncap artificially truncated article bodies
+      const truncated = document.querySelectorAll('article, [class*="article-body"], [class*="post-content"], [class*="story-body"], [id*="article-body"]');
+      truncated.forEach(el => {
+        const style = window.getComputedStyle(el);
+        if (style.maxHeight && style.maxHeight !== 'none' && parseInt(style.maxHeight, 10) < 650) {
+          el.style.setProperty('max-height', 'none', 'important');
+          el.style.setProperty('height', 'auto', 'important');
+          el.style.setProperty('overflow', 'visible', 'important');
+        }
+      });
+
+      // 3. Remove paywall fade-out overlays
+      const fadeOverlays = document.querySelectorAll('[class*="paywall-overlay"], [class*="fade-out"], [class*="gradient-overlay"], [class*="truncate-overlay"], [id*="paywall-overlay"]');
+      fadeOverlays.forEach(o => eradicateElement(o, 'fade-overlay'));
+    } catch (e) {}
+  }
+
+  /**
+   * 6. Universal Selection & Right-Click Unlocker
+   */
+  let selectionUnlocked = false;
+  function enableSelectionAndCopy() {
+    if (!config.unlockCopy || selectionUnlocked) return;
+    selectionUnlocked = true;
+
+    // Force user-select text
+    try {
+      document.documentElement.style.setProperty('-webkit-user-select', 'text', 'important');
+      document.documentElement.style.setProperty('user-select', 'text', 'important');
+    } catch (e) {}
+
+    // Neutralize capture-phase blockers
+    const events = ['contextmenu', 'selectstart', 'dragstart'];
+    events.forEach(evtName => {
+      window.addEventListener(evtName, (e) => {
+        if (!config.unlockCopy) return;
+        e.stopPropagation();
+      }, true);
+    });
+
+    // Clear inline property overrides
+    try {
+      document.oncontextmenu = null;
+      document.onselectstart = null;
+      if (document.body) {
+        document.body.oncontextmenu = null;
+        document.body.onselectstart = null;
+      }
+    } catch (e) {}
+
+    // Sanitize clipboard pollution on copy
+    document.addEventListener('copy', (e) => {
+      if (!config.unlockCopy) return;
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) return;
+      const cleanText = selection.toString();
+      if (cleanText && e.clipboardData) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        e.clipboardData.setData('text/plain', cleanText);
+      }
+    }, true);
+  }
+
+  /**
+   * 7. Clean URL Tracking Parameters on Copy
+   */
+  let urlCleanerAttached = false;
+  function attachUrlCleaner() {
+    if (urlCleanerAttached) return;
+    urlCleanerAttached = true;
+
+    document.addEventListener('copy', (e) => {
+      if (!config.cleanUrls) return;
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) return;
+      const rawText = selection.toString().trim();
+
+      if (rawText.startsWith('http://') || rawText.startsWith('https://')) {
+        try {
+          const parsed = new URL(rawText);
+          let cleaned = false;
+          TRACKING_PARAMS.forEach(param => {
+            if (parsed.searchParams.has(param)) {
+              parsed.searchParams.delete(param);
+              cleaned = true;
+            }
+          });
+          if (cleaned && e.clipboardData) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            e.clipboardData.setData('text/plain', parsed.toString());
+          }
+        } catch (err) {}
+      }
+    }, true);
+  }
+
+  /**
+   * 8. Custom User Selectors
    */
   function sweepCustomSelectors() {
     if (!config.customSelectors || !config.customSelectors.length) return;
@@ -353,7 +474,7 @@
   }
 
   /**
-   * 6. Scroll Lock Breaker
+   * 9. Scroll Lock Breaker
    */
   function breakScrollLock() {
     if (!config.restoreScroll) return;
@@ -362,13 +483,11 @@
     const body = document.body;
     if (!html) return;
 
-    // Remove lock classes
     LOCK_CLASSES.forEach(cls => {
       if (html.classList.contains(cls)) html.classList.remove(cls);
       if (body && body.classList.contains(cls)) body.classList.remove(cls);
     });
 
-    // Check inline and computed overflow styles
     if (html.style.overflow === 'hidden' || html.style.overflowY === 'hidden') {
       html.style.setProperty('overflow', 'auto', 'important');
       html.style.setProperty('overflow-y', 'auto', 'important');
@@ -385,7 +504,7 @@
   }
 
   /**
-   * 7. Autoplay Video Management
+   * 10. Autoplay Video Management
    */
   function enforceAutoplayPolicy() {
     if (!config.stopAutoplay) return;
@@ -407,6 +526,124 @@
   }
 
   /**
+   * 11. Element Zapper (Click-to-Kill with Memory)
+   */
+  function generateStableSelector(el) {
+    if (!el || el === document.body || el === document.documentElement) return null;
+
+    if (el.id && !/\d{4,}/.test(el.id)) {
+      return `#${CSS.escape(el.id)}`;
+    }
+
+    const validClasses = Array.from(el.classList).filter(c =>
+      !c.startsWith('browseclean') &&
+      !/\d{4,}/.test(c) &&
+      !c.includes(':')
+    );
+
+    const tagName = el.tagName.toLowerCase();
+
+    if (validClasses.length > 0) {
+      const classSelector = `${tagName}.${validClasses.slice(0, 2).map(c => CSS.escape(c)).join('.')}`;
+      if (document.querySelectorAll(classSelector).length === 1) {
+        return classSelector;
+      }
+    }
+
+    let parent = el.parentElement;
+    if (parent && parent !== document.body) {
+      if (parent.id && !/\d{4,}/.test(parent.id)) {
+        return `#${CSS.escape(parent.id)} > ${tagName}`;
+      }
+      const idx = Array.from(parent.children).indexOf(el) + 1;
+      return `${parent.tagName.toLowerCase()} > ${tagName}:nth-child(${idx})`;
+    }
+
+    return tagName;
+  }
+
+  function startZapperMode() {
+    if (isZapperActive) return;
+    isZapperActive = true;
+
+    // Create Zapper HUD Banner
+    const banner = document.createElement('div');
+    banner.id = 'browseclean-zapper-banner';
+    banner.innerHTML = `
+      <span>ZAPPER MODE &mdash; Hover and click any element to remove permanently.</span>
+      <button id="browseclean-zapper-exit">Exit (Esc)</button>
+    `;
+    document.documentElement.appendChild(banner);
+
+    let currentTarget = null;
+
+    function onMouseOver(e) {
+      if (e.target.closest('#browseclean-zapper-banner')) return;
+      if (currentTarget) currentTarget.classList.remove('browseclean-zapper-hover');
+      currentTarget = e.target;
+      currentTarget.classList.add('browseclean-zapper-hover');
+    }
+
+    function onMouseOut(e) {
+      if (e.target === currentTarget) {
+        e.target.classList.remove('browseclean-zapper-hover');
+        currentTarget = null;
+      }
+    }
+
+    function onClick(e) {
+      if (e.target.closest('#browseclean-zapper-banner')) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const target = currentTarget || e.target;
+      if (target) {
+        target.classList.remove('browseclean-zapper-hover');
+        const selector = generateStableSelector(target);
+
+        // Remove element immediately
+        eradicateElement(target, 'zapped');
+
+        // Persist to customSelectors
+        if (selector) {
+          chrome.storage.local.get(['settings'], (res) => {
+            const current = res.settings || config;
+            if (!current.customSelectors) current.customSelectors = [];
+            current.customSelectors.push({ domain: currentHostname, selector: selector });
+            chrome.storage.local.set({ settings: current });
+            config = current;
+          });
+        }
+      }
+
+      exitZapperMode();
+    }
+
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        exitZapperMode();
+      }
+    }
+
+    function exitZapperMode() {
+      isZapperActive = false;
+      if (currentTarget) currentTarget.classList.remove('browseclean-zapper-hover');
+      document.removeEventListener('mouseover', onMouseOver, true);
+      document.removeEventListener('mouseout', onMouseOut, true);
+      document.removeEventListener('click', onClick, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      const b = document.getElementById('browseclean-zapper-banner');
+      if (b) b.remove();
+    }
+
+    document.getElementById('browseclean-zapper-exit').addEventListener('click', exitZapperMode);
+    document.addEventListener('mouseover', onMouseOver, true);
+    document.addEventListener('mouseout', onMouseOut, true);
+    document.addEventListener('click', onClick, true);
+    document.addEventListener('keydown', onKeyDown, true);
+  }
+
+  /**
    * Main Pipeline execution
    */
   function executeSweep() {
@@ -415,9 +652,12 @@
     sweepChatWidgets();
     sweepSurveys();
     sweepNewsletterModals();
+    sweepPaywallBlurs();
     sweepCustomSelectors();
     breakScrollLock();
     enforceAutoplayPolicy();
+    enableSelectionAndCopy();
+    attachUrlCleaner();
   }
 
   /**
@@ -442,16 +682,13 @@
         config = Object.assign(config, res.settings);
       }
 
-      // Check domain whitelist
       if (config.whitelistedDomains && config.whitelistedDomains.includes(currentHostname)) {
         isCleanActive = false;
         return;
       }
 
-      // Execute initial sweep immediately
       executeSweep();
 
-      // Hook observer to document root
       const root = document.documentElement || document;
       observer.observe(root, {
         childList: true,
@@ -460,7 +697,6 @@
         attributeFilter: ['class', 'style']
       });
 
-      // Periodic sweeps for late-loading scripts during first 10 seconds
       let sweeps = 0;
       const interval = setInterval(() => {
         executeSweep();
@@ -488,6 +724,12 @@
       return true;
     }
 
+    if (msg.action === 'startZapper') {
+      startZapperMode();
+      sendResponse({ success: true });
+      return true;
+    }
+
     if (msg.action === 'updateSettings') {
       config = Object.assign(config, msg.settings);
       const whitelisted = config.whitelistedDomains && config.whitelistedDomains.includes(currentHostname);
@@ -500,7 +742,6 @@
     }
   });
 
-  // Start engine as early as possible
   startEngine();
 
   if (document.readyState === 'loading') {
