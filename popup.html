@@ -12,7 +12,7 @@
     <header class="header">
       <div class="brand">
         <span class="brand-title">BrowseClean</span>
-        <span class="brand-version">v1.0.0</span>
+        <span class="brand-version">v1.1.0</span>
       </div>
       <button id="openOptionsBtn" class="icon-btn" title="Settings" aria-label="Settings">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -47,12 +47,13 @@
       </div>
     </div>
 
-    <!-- Primary Action -->
-    <button id="manualSweepBtn" class="action-btn">
-      Sweep Page Elements
-    </button>
+    <!-- Actions Grid -->
+    <div class="action-grid">
+      <button id="manualSweepBtn" class="action-btn">Sweep Page</button>
+      <button id="startZapperBtn" class="action-btn action-zapper" title="Shortcut: Alt+Z">Zap Element (Alt+Z)</button>
+    </div>
 
-    <!-- Filters -->
+    <!-- Filters Section -->
     <div class="filter-section">
       <div class="section-title">Rules</div>
 
@@ -85,6 +86,39 @@
         </div>
         <label class="switch mini">
           <input type="checkbox" id="toggleChats" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Unblur Soft Paywalls</span>
+          <span class="filter-desc">Removes CSS blur and height caps on articles</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleUnblur" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Unlock Copy & Right-Click</span>
+          <span class="filter-desc">Enables selection and stops clipboard hijacking</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleCopy" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-meta">
+          <span class="filter-name">Clean Tracking URLs</span>
+          <span class="filter-desc">Strips utm_ and tracking bloat on copy</span>
+        </div>
+        <label class="switch mini">
+          <input type="checkbox" id="toggleCleanUrls" checked>
           <span class="slider"></span>
         </label>
       </div>
