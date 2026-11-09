@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleNewsletters = document.getElementById('toggleNewsletters');
   const toggleChats = document.getElementById('toggleChats');
   const toggleUnblur = document.getElementById('toggleUnblur');
+  const toggleAntiAdblock = document.getElementById('toggleAntiAdblock');
   const toggleCopy = document.getElementById('toggleCopy');
   const toggleCleanUrls = document.getElementById('toggleCleanUrls');
   const toggleScroll = document.getElementById('toggleScroll');
@@ -35,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     unblurContent: true,
     unlockCopy: true,
     cleanUrls: true,
+    blockAntiAdblock: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -69,6 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleNewsletters.checked = !!activeSettings.blockNewsletters;
     toggleChats.checked = !!activeSettings.blockChats;
     toggleUnblur.checked = !!activeSettings.unblurContent;
+    if (toggleAntiAdblock) toggleAntiAdblock.checked = !!activeSettings.blockAntiAdblock;
     toggleCopy.checked = !!activeSettings.unlockCopy;
     toggleCleanUrls.checked = !!activeSettings.cleanUrls;
     toggleScroll.checked = !!activeSettings.restoreScroll;
@@ -145,6 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   toggleNewsletters.addEventListener('change', () => { activeSettings.blockNewsletters = toggleNewsletters.checked; persistSettings(); });
   toggleChats.addEventListener('change', () => { activeSettings.blockChats = toggleChats.checked; persistSettings(); });
   toggleUnblur.addEventListener('change', () => { activeSettings.unblurContent = toggleUnblur.checked; persistSettings(); });
+  if (toggleAntiAdblock) toggleAntiAdblock.addEventListener('change', () => { activeSettings.blockAntiAdblock = toggleAntiAdblock.checked; persistSettings(); });
   toggleCopy.addEventListener('change', () => { activeSettings.unlockCopy = toggleCopy.checked; persistSettings(); });
   toggleCleanUrls.addEventListener('change', () => { activeSettings.cleanUrls = toggleCleanUrls.checked; persistSettings(); });
   toggleScroll.addEventListener('change', () => { activeSettings.restoreScroll = toggleScroll.checked; persistSettings(); });
