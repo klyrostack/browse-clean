@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const optNewsletters = document.getElementById('opt-newsletters');
   const optChats = document.getElementById('opt-chats');
   const optUnblur = document.getElementById('opt-unblur');
+  const optAntiAdblock = document.getElementById('opt-antiadblock');
   const optCopy = document.getElementById('opt-copy');
   const optCleanUrls = document.getElementById('opt-cleanurls');
   const optScroll = document.getElementById('opt-scroll');
@@ -53,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     unblurContent: true,
     unlockCopy: true,
     cleanUrls: true,
+    blockAntiAdblock: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -67,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
       optNewsletters.checked = !!currentSettings.blockNewsletters;
       optChats.checked = !!currentSettings.blockChats;
       if (optUnblur) optUnblur.checked = !!currentSettings.unblurContent;
+      if (optAntiAdblock) optAntiAdblock.checked = !!currentSettings.blockAntiAdblock;
       if (optCopy) optCopy.checked = !!currentSettings.unlockCopy;
       if (optCleanUrls) optCleanUrls.checked = !!currentSettings.cleanUrls;
       optScroll.checked = !!currentSettings.restoreScroll;
@@ -86,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
   optNewsletters.addEventListener('change', () => { currentSettings.blockNewsletters = optNewsletters.checked; saveSettings(); });
   optChats.addEventListener('change', () => { currentSettings.blockChats = optChats.checked; saveSettings(); });
   if (optUnblur) optUnblur.addEventListener('change', () => { currentSettings.unblurContent = optUnblur.checked; saveSettings(); });
+  if (optAntiAdblock) optAntiAdblock.addEventListener('change', () => { currentSettings.blockAntiAdblock = optAntiAdblock.checked; saveSettings(); });
   if (optCopy) optCopy.addEventListener('change', () => { currentSettings.unlockCopy = optCopy.checked; saveSettings(); });
   if (optCleanUrls) optCleanUrls.addEventListener('change', () => { currentSettings.cleanUrls = optCleanUrls.checked; saveSettings(); });
   optScroll.addEventListener('change', () => { currentSettings.restoreScroll = optScroll.checked; saveSettings(); });
