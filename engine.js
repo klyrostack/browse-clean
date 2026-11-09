@@ -29,6 +29,7 @@
     unblurContent: true,
     unlockCopy: true,
     cleanUrls: true,
+    blockAntiAdblock: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -158,6 +159,27 @@
     'div[id*="qualpro" i]'
   ];
 
+  // Anti-adblock container selectors
+  const ANTI_ADBLOCK_SELECTORS = [
+    '#admiral-root',
+    '.admiral-dialog',
+    '.admiral-backdrop',
+    'div[id^="admiral-"]',
+    'div[class*="admiral-"]',
+    '#bab-modal',
+    '.bab-modal',
+    '#adblock-modal',
+    '.adblock-modal',
+    '.adblock-overlay',
+    '.adblock-wall',
+    '.anti-adblock-container',
+    'div[class*="adblock-wall"]',
+    'div[id*="adblock-wall"]',
+    'div[class*="ad-blocker-message"]',
+    'div[class*="fc-ab-root"]',
+    'div[class*="fc-dialog-container"]'
+  ];
+
   // Scroll lock classes to neutralize
   const LOCK_CLASSES = [
     'sp-message-open',
@@ -167,7 +189,10 @@
     'has-modal',
     'overflow-hidden',
     'prevent-scroll',
-    'is-locked'
+    'is-locked',
+    'admiral-lock',
+    'ab-lock',
+    'adblock-lock'
   ];
 
   /**
@@ -374,6 +399,56 @@
       // 3. Remove paywall fade-out overlays
       const fadeOverlays = document.querySelectorAll('[class*="paywall-overlay"], [class*="fade-out"], [class*="gradient-overlay"], [class*="truncate-overlay"], [id*="paywall-overlay"]');
       fadeOverlays.forEach(o => eradicateElement(o, 'fade-overlay'));
+    } catch (e) {}
+  }
+
+  /**
+   * 6. Anti-Adblock Wall Bypasser (Admiral, BlockAdBlock, Funding Choices)
+   */
+  function sweepAntiAdblockWalls() {
+    if (!config.blockAntiAdblock) return;
+
+    // A. Specific anti-adblock framework selectors
+    ANTI_ADBLOCK_SELECTORS.forEach(sel => {
+      try {
+        const elements = document.querySelectorAll(sel);
+        elements.forEach(el => {
+          eradicateElement(el, 'anti-adblock');
+          breakScrollLock();
+        });
+      } catch (e) {}
+    });
+
+    // B. Heuristic scan for anti-adblock detection dialogs
+    try {
+      const modals = document.querySelectorAll('div, section, aside, [role="dialog"]');
+      modals.forEach(el => {
+        if (el.dataset.bcScrubbed) return;
+        const style = window.getComputedStyle(el);
+        const isOverlay = (style.position === 'fixed' || style.position === 'sticky') && parseInt(style.zIndex, 10) > 80;
+        if (isOverlay) {
+          const text = (el.innerText || '').toLowerCase();
+          const matchesAntiAdblock = (
+            text.includes('ad blocker detected') ||
+            text.includes('adblock detected') ||
+            text.includes('disable your ad blocker') ||
+            text.includes('turn off your ad blocker') ||
+            text.includes('disable adblock') ||
+            text.includes('please whitelist our website') ||
+            text.includes('using an ad blocker') ||
+            text.includes('ad-blocker detected')
+          );
+
+          if (matchesAntiAdblock) {
+            const prev = el.previousElementSibling;
+            if (prev && window.getComputedStyle(prev).position === 'fixed') {
+              eradicateElement(prev, 'anti-adblock-backdrop');
+            }
+            eradicateElement(el, 'anti-adblock-heuristic');
+            breakScrollLock();
+          }
+        }
+      });
     } catch (e) {}
   }
 
@@ -653,6 +728,7 @@
     sweepSurveys();
     sweepNewsletterModals();
     sweepPaywallBlurs();
+    sweepAntiAdblockWalls();
     sweepCustomSelectors();
     breakScrollLock();
     enforceAutoplayPolicy();

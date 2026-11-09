@@ -138,7 +138,37 @@ div[class*="email-signup" i][style*="fixed"] {
 }
 
 /* ==========================================================================
-   4. ANTI-SCROLL-LOCK ENFORCEMENT
+   4. ANTI-ADBLOCK WALLS (Admiral, BlockAdBlock, Funding Choices, Generic)
+   ========================================================================== */
+div[id^="admiral-"],
+div[class*="admiral-"],
+.admiral-backdrop,
+.admiral-dialog,
+#admiral-root,
+#bab-modal,
+.bab-modal,
+#adblock-modal,
+.adblock-modal,
+.adblock-overlay,
+.adblock-wall,
+.anti-adblock-container,
+div[class*="adblock-wall"],
+div[id*="adblock-wall"],
+div[class*="ad-blocker-message"],
+div[class*="fc-ab-root"],
+div[class*="fc-dialog-container"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  z-index: -99999 !important;
+}
+
+/* ==========================================================================
+   5. ANTI-SCROLL-LOCK ENFORCEMENT
    Prevent websites from freezing scrolling when a modal is suppressed
    ========================================================================== */
 html.sp-message-open,
@@ -147,6 +177,10 @@ html.didomi-popup-open,
 body.didomi-popup-open,
 html.modal-open,
 body.modal-open,
+html[class*="admiral"],
+body[class*="admiral"],
+html[class*="adblock"],
+body[class*="adblock"],
 html[style*="overflow: hidden"],
 body[style*="overflow: hidden"],
 html[style*="overflow-y: hidden"],
@@ -159,7 +193,7 @@ body[style*="overflow-y: hidden"] {
 }
 
 /* ==========================================================================
-   5. ELEMENT ZAPPER HUD STYLING
+   6. ELEMENT ZAPPER HUD STYLING
    ========================================================================== */
 #browseclean-zapper-banner {
   position: fixed !important;
