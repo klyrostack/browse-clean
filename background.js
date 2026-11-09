@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   unblurContent: true,
   unlockCopy: true,
   cleanUrls: true,
+  blockAntiAdblock: true,
   whitelistedDomains: [],
   customSelectors: []
 };
