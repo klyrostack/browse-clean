@@ -168,7 +168,60 @@ div[class*="fc-dialog-container"] {
 }
 
 /* ==========================================================================
-   5. ANTI-SCROLL-LOCK ENFORCEMENT
+   5. FORCED LOGIN & REGISTRATION WALLS (Quora, Glassdoor, Pinterest, Reddit, Scribd)
+   ========================================================================== */
+.modal_signup_dialog,
+div[id*="signup_wall" i],
+div[class*="signup_wall" i],
+div[id*="login_wall" i],
+div[class*="login_wall" i],
+div[class*="BaseSignupForm" i],
+div[id*="FullPageModal" i],
+div[class*="FullPageModal" i],
+#HdrModal,
+#ContentWall,
+#ContentWallHdr,
+div[class*="hiding-wrapper" i],
+div[class*="hidingWrapper" i],
+div[class*="ContentWall" i],
+div[id*="ContentWall" i],
+div[data-test="content-wall"],
+div[data-test-id="full-page-signup-modal"],
+#desktop_unified_auth_container,
+div[data-test-id="login-modal-default"],
+div[data-test-id="register-modal-default"],
+div[data-test-id="unauth-bottom-banner"],
+div[data-test-id="gift-wrap"],
+#login-modal,
+auth-flow-modal,
+reddit-drawer[modal-type="login"],
+div[slot="upsell-body"],
+.autobind_overlay,
+.between_page_module,
+.page_blur_promo,
+.document_blur_promo,
+#blocking_mask,
+div[class*="sign-in-modal" i],
+div[class*="forced-login" i],
+div[id*="forced-login" i],
+div[class*="login-wall" i],
+div[id*="login-wall" i],
+div[class*="signup-wall" i],
+div[id*="signup-wall" i],
+div[class*="auth-modal" i],
+div[id*="auth-modal" i] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  z-index: -99999 !important;
+}
+
+/* ==========================================================================
+   6. ANTI-SCROLL-LOCK ENFORCEMENT
    Prevent websites from freezing scrolling when a modal is suppressed
    ========================================================================== */
 html.sp-message-open,
@@ -177,6 +230,14 @@ html.didomi-popup-open,
 body.didomi-popup-open,
 html.modal-open,
 body.modal-open,
+html.has-modal,
+body.has-modal,
+html[class*="has-modal"],
+body[class*="has-modal"],
+html[class*="signup"],
+body[class*="signup"],
+html[class*="login"],
+body[class*="login"],
 html[class*="admiral"],
 body[class*="admiral"],
 html[class*="adblock"],
@@ -193,7 +254,7 @@ body[style*="overflow-y: hidden"] {
 }
 
 /* ==========================================================================
-   6. ELEMENT ZAPPER HUD STYLING
+   7. ELEMENT ZAPPER HUD STYLING
    ========================================================================== */
 #browseclean-zapper-banner {
   position: fixed !important;
