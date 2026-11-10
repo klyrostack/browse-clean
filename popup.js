@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleChats = document.getElementById('toggleChats');
   const toggleUnblur = document.getElementById('toggleUnblur');
   const toggleAntiAdblock = document.getElementById('toggleAntiAdblock');
+  const toggleLoginWalls = document.getElementById('toggleLoginWalls');
   const toggleCopy = document.getElementById('toggleCopy');
   const toggleCleanUrls = document.getElementById('toggleCleanUrls');
   const toggleScroll = document.getElementById('toggleScroll');
@@ -37,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     unlockCopy: true,
     cleanUrls: true,
     blockAntiAdblock: true,
+    blockLoginWalls: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -72,6 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleChats.checked = !!activeSettings.blockChats;
     toggleUnblur.checked = !!activeSettings.unblurContent;
     if (toggleAntiAdblock) toggleAntiAdblock.checked = !!activeSettings.blockAntiAdblock;
+    if (toggleLoginWalls) toggleLoginWalls.checked = !!activeSettings.blockLoginWalls;
     toggleCopy.checked = !!activeSettings.unlockCopy;
     toggleCleanUrls.checked = !!activeSettings.cleanUrls;
     toggleScroll.checked = !!activeSettings.restoreScroll;
@@ -149,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   toggleChats.addEventListener('change', () => { activeSettings.blockChats = toggleChats.checked; persistSettings(); });
   toggleUnblur.addEventListener('change', () => { activeSettings.unblurContent = toggleUnblur.checked; persistSettings(); });
   if (toggleAntiAdblock) toggleAntiAdblock.addEventListener('change', () => { activeSettings.blockAntiAdblock = toggleAntiAdblock.checked; persistSettings(); });
+  if (toggleLoginWalls) toggleLoginWalls.addEventListener('change', () => { activeSettings.blockLoginWalls = toggleLoginWalls.checked; persistSettings(); });
   toggleCopy.addEventListener('change', () => { activeSettings.unlockCopy = toggleCopy.checked; persistSettings(); });
   toggleCleanUrls.addEventListener('change', () => { activeSettings.cleanUrls = toggleCleanUrls.checked; persistSettings(); });
   toggleScroll.addEventListener('change', () => { activeSettings.restoreScroll = toggleScroll.checked; persistSettings(); });
