@@ -22,6 +22,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Customer Chat SDKs**: Intercom, Drift, Zendesk / Zopim, Crisp, Tawk.to, HubSpot, Freshchat, Zoho SalesIQ.
 * **Soft-Paywall Unblurrer**: Removes artificial CSS `filter: blur()`, height constraints, and gradient fade-out overlays on articles.
 * **Anti-Adblock Wall Bypasser**: Neutralizes Admiral, BlockAdBlock, and aggressive "disable your ad blocker" detection overlays.
+* **Forced Login Wall Destroyer**: Bypasses full-screen registration gates, unmasks hidden answers/reviews, and restores scrolling on Quora, Glassdoor, Pinterest, Reddit, Scribd, and SlideShare.
 * **Universal Selection & Right-Click Unlocker**: Bypasses contextmenu blocking, re-enables text selection, and prevents clipboard tracking hijacking.
 * **URL Tracker Cleaner**: Strips `utm_*`, `fbclid`, `gclid`, `si`, and other tracking parameters automatically when copying links.
 * **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
