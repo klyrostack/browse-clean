@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const optChats = document.getElementById('opt-chats');
   const optUnblur = document.getElementById('opt-unblur');
   const optAntiAdblock = document.getElementById('opt-antiadblock');
+  const optLoginWalls = document.getElementById('opt-loginwalls');
   const optCopy = document.getElementById('opt-copy');
   const optCleanUrls = document.getElementById('opt-cleanurls');
   const optScroll = document.getElementById('opt-scroll');
@@ -55,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     unlockCopy: true,
     cleanUrls: true,
     blockAntiAdblock: true,
+    blockLoginWalls: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -70,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
       optChats.checked = !!currentSettings.blockChats;
       if (optUnblur) optUnblur.checked = !!currentSettings.unblurContent;
       if (optAntiAdblock) optAntiAdblock.checked = !!currentSettings.blockAntiAdblock;
+      if (optLoginWalls) optLoginWalls.checked = !!currentSettings.blockLoginWalls;
       if (optCopy) optCopy.checked = !!currentSettings.unlockCopy;
       if (optCleanUrls) optCleanUrls.checked = !!currentSettings.cleanUrls;
       optScroll.checked = !!currentSettings.restoreScroll;
@@ -90,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
   optChats.addEventListener('change', () => { currentSettings.blockChats = optChats.checked; saveSettings(); });
   if (optUnblur) optUnblur.addEventListener('change', () => { currentSettings.unblurContent = optUnblur.checked; saveSettings(); });
   if (optAntiAdblock) optAntiAdblock.addEventListener('change', () => { currentSettings.blockAntiAdblock = optAntiAdblock.checked; saveSettings(); });
+  if (optLoginWalls) optLoginWalls.addEventListener('change', () => { currentSettings.blockLoginWalls = optLoginWalls.checked; saveSettings(); });
   if (optCopy) optCopy.addEventListener('change', () => { currentSettings.unlockCopy = optCopy.checked; saveSettings(); });
   if (optCleanUrls) optCleanUrls.addEventListener('change', () => { currentSettings.cleanUrls = optCleanUrls.checked; saveSettings(); });
   optScroll.addEventListener('change', () => { currentSettings.restoreScroll = optScroll.checked; saveSettings(); });
