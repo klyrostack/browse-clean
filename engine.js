@@ -30,6 +30,7 @@
     unlockCopy: true,
     cleanUrls: true,
     blockAntiAdblock: true,
+    blockLoginWalls: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -180,6 +181,50 @@
     'div[class*="fc-dialog-container"]'
   ];
 
+  // Forced sign-in and registration wall selectors
+  const LOGIN_WALL_SELECTORS = [
+    '.modal_signup_dialog',
+    'div[id*="signup_wall" i]',
+    'div[class*="signup_wall" i]',
+    'div[id*="login_wall" i]',
+    'div[class*="login_wall" i]',
+    'div[class*="BaseSignupForm" i]',
+    'div[id*="FullPageModal" i]',
+    'div[class*="FullPageModal" i]',
+    '#HdrModal',
+    '#ContentWall',
+    '#ContentWallHdr',
+    'div[class*="hiding-wrapper" i]',
+    'div[class*="hidingWrapper" i]',
+    'div[class*="ContentWall" i]',
+    'div[id*="ContentWall" i]',
+    'div[data-test="content-wall"]',
+    'div[data-test-id="full-page-signup-modal"]',
+    '#desktop_unified_auth_container',
+    'div[data-test-id="login-modal-default"]',
+    'div[data-test-id="register-modal-default"]',
+    'div[data-test-id="unauth-bottom-banner"]',
+    'div[data-test-id="gift-wrap"]',
+    '#login-modal',
+    'auth-flow-modal',
+    'reddit-drawer[modal-type="login"]',
+    'div[slot="upsell-body"]',
+    '.autobind_overlay',
+    '.between_page_module',
+    '.page_blur_promo',
+    '.document_blur_promo',
+    '#blocking_mask',
+    'div[class*="sign-in-modal" i]',
+    'div[class*="forced-login" i]',
+    'div[id*="forced-login" i]',
+    'div[class*="login-wall" i]',
+    'div[id*="login-wall" i]',
+    'div[class*="signup-wall" i]',
+    'div[id*="signup-wall" i]',
+    'div[class*="auth-modal" i]',
+    'div[id*="auth-modal" i]'
+  ];
+
   // Scroll lock classes to neutralize
   const LOCK_CLASSES = [
     'sp-message-open',
@@ -192,7 +237,9 @@
     'is-locked',
     'admiral-lock',
     'ab-lock',
-    'adblock-lock'
+    'adblock-lock',
+    'signup-wall',
+    'login-wall'
   ];
 
   /**
@@ -445,6 +492,101 @@
               eradicateElement(prev, 'anti-adblock-backdrop');
             }
             eradicateElement(el, 'anti-adblock-heuristic');
+            breakScrollLock();
+          }
+        }
+      });
+    } catch (e) {}
+  }
+
+  /**
+   * 7. Forced Sign-In & Login Wall Destroyer (Quora, Glassdoor, Pinterest, Scribd)
+   */
+  function sweepLoginWalls() {
+    if (!config.blockLoginWalls) return;
+
+    // A. Framework and target-specific selectors
+    LOGIN_WALL_SELECTORS.forEach(sel => {
+      try {
+        const elements = document.querySelectorAll(sel);
+        elements.forEach(el => {
+          eradicateElement(el, 'login-wall');
+          breakScrollLock();
+        });
+      } catch (e) {}
+    });
+
+    // B. Target-specific DOM unclamping and restoration
+    // 1. Quora answers unmasking
+    if (currentHostname.includes('quora.com')) {
+      try {
+        const blurredBoxes = document.querySelectorAll('.q-box, .q-text, div[class*="TruncatedWrapper"]');
+        blurredBoxes.forEach(box => {
+          if (box.style.filter && box.style.filter.includes('blur')) {
+            box.style.setProperty('filter', 'none', 'important');
+            box.style.setProperty('user-select', 'text', 'important');
+          }
+          if (box.style.maxHeight && box.style.maxHeight !== 'none') {
+            box.style.setProperty('max-height', 'none', 'important');
+            box.style.setProperty('height', 'auto', 'important');
+            box.style.setProperty('overflow', 'visible', 'important');
+          }
+        });
+      } catch (e) {}
+    }
+
+    // 2. Glassdoor review and salary unclamping
+    if (currentHostname.includes('glassdoor.com')) {
+      try {
+        const truncatedReviews = document.querySelectorAll('div[id*="ReviewContent"], div[class*="reviewContent"], div[class*="ReviewText"], .gdReview');
+        truncatedReviews.forEach(r => {
+          r.style.setProperty('max-height', 'none', 'important');
+          r.style.setProperty('height', 'auto', 'important');
+          r.style.setProperty('overflow', 'visible', 'important');
+          r.style.setProperty('filter', 'none', 'important');
+        });
+        const backdrops = document.querySelectorAll('.modal_backdrop, div[class*="modal_backdrop"]');
+        backdrops.forEach(b => eradicateElement(b, 'glassdoor-backdrop'));
+      } catch (e) {}
+    }
+
+    // 3. Scribd / SlideShare document page unblurring
+    if (currentHostname.includes('scribd.com') || currentHostname.includes('slideshare.net')) {
+      try {
+        const blurredPages = document.querySelectorAll('.page_blur_promo, .document_blur_promo, .blurred_page, [class*="blurred_page"]');
+        blurredPages.forEach(p => {
+          p.style.setProperty('filter', 'none', 'important');
+          p.style.setProperty('-webkit-filter', 'none', 'important');
+        });
+      } catch (e) {}
+    }
+
+    // C. Heuristic scan for forced signup/login modals
+    try {
+      const overlays = document.querySelectorAll('div, section, aside, [role="dialog"], [role="alertdialog"]');
+      overlays.forEach(el => {
+        if (el.dataset.bcScrubbed) return;
+        const style = window.getComputedStyle(el);
+        const isOverlay = (style.position === 'fixed' || style.position === 'sticky') && parseInt(style.zIndex, 10) > 80;
+        if (isOverlay) {
+          const text = (el.innerText || '').toLowerCase();
+          const matchesLoginWall = (
+            text.includes('sign up to continue reading') ||
+            text.includes('sign in to continue reading') ||
+            text.includes('log in to continue reading') ||
+            text.includes('create an account to continue reading') ||
+            text.includes('sign up to read the rest') ||
+            text.includes('sign in to read the rest') ||
+            text.includes('join to view full') ||
+            text.includes('create a free account to continue')
+          );
+
+          if (matchesLoginWall) {
+            const prev = el.previousElementSibling;
+            if (prev && window.getComputedStyle(prev).position === 'fixed') {
+              eradicateElement(prev, 'login-wall-backdrop');
+            }
+            eradicateElement(el, 'login-wall-heuristic');
             breakScrollLock();
           }
         }
@@ -729,6 +871,7 @@
     sweepNewsletterModals();
     sweepPaywallBlurs();
     sweepAntiAdblockWalls();
+    sweepLoginWalls();
     sweepCustomSelectors();
     breakScrollLock();
     enforceAutoplayPolicy();
