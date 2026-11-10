@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   unlockCopy: true,
   cleanUrls: true,
   blockAntiAdblock: true,
+  blockLoginWalls: true,
   whitelistedDomains: [],
   customSelectors: []
 };
