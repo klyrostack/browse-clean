@@ -31,6 +31,7 @@
     cleanUrls: true,
     blockAntiAdblock: true,
     blockLoginWalls: true,
+    reclaimViewport: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -861,6 +862,100 @@
   }
 
   /**
+   * 12. Viewport Reclaim Engine (Sticky Header & Floating Bar Shrinker)
+   */
+  let viewportListenerAttached = false;
+  function reclaimViewportRealEstate() {
+    if (!config.reclaimViewport) {
+      document.querySelectorAll('.browseclean-compact-header').forEach(el => el.classList.remove('browseclean-compact-header'));
+      document.querySelectorAll('.browseclean-unstick').forEach(el => el.classList.remove('browseclean-unstick'));
+      document.querySelectorAll('.browseclean-suppress-dock').forEach(el => el.classList.remove('browseclean-suppress-dock'));
+      return;
+    }
+
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+
+    // Return to top: revert compressed headers so full hero navbar displays
+    if (scrollY <= 60) {
+      document.querySelectorAll('.browseclean-compact-header').forEach(el => el.classList.remove('browseclean-compact-header'));
+      return;
+    }
+
+    if (scrollY > 160) {
+      const candidates = document.querySelectorAll('header, [role="banner"], div[class*="header" i], div[class*="navbar" i], div[class*="nav-bar" i], div[class*="announcement" i], div[class*="promo-bar" i], div[class*="bottom-bar" i], div[class*="sticky" i], div[class*="floating" i]');
+      candidates.forEach(el => {
+        if (el.dataset.bcScrubbed || el.id === 'browseclean-zapper-banner') return;
+        const style = window.getComputedStyle(el);
+        const isSticky = style.position === 'fixed' || style.position === 'sticky';
+        if (!isSticky) return;
+
+        const rect = el.getBoundingClientRect();
+
+        // 1. Un-stick secondary announcement ribbons & promo banners pinned to top
+        if (rect.top <= 10 && rect.height > 20 && rect.height < 140) {
+          const className = (el.className || '').toString().toLowerCase();
+          const id = (el.id || '').toString().toLowerCase();
+          const isRibbon = (
+            className.includes('announcement') ||
+            className.includes('promo') ||
+            className.includes('notification') ||
+            className.includes('top-bar') ||
+            className.includes('banner') ||
+            id.includes('announcement') ||
+            id.includes('promo') ||
+            id.includes('banner')
+          ) && el.tagName !== 'HEADER' && el.tagName !== 'NAV';
+
+          if (isRibbon && !el.classList.contains('browseclean-unstick')) {
+            el.classList.add('browseclean-unstick');
+          }
+        }
+
+        // 2. Shrink oversized primary sticky headers (>75px tall)
+        if (rect.top <= 10 && rect.height > 75) {
+          if (!el.classList.contains('browseclean-compact-header') && !el.classList.contains('browseclean-unstick')) {
+            el.classList.add('browseclean-compact-header');
+          }
+        }
+
+        // 3. Suppress floating bottom docks / install app bars
+        if (rect.bottom >= window.innerHeight - 8 && rect.top > window.innerHeight * 0.65) {
+          const className = (el.className || '').toString().toLowerCase();
+          const id = (el.id || '').toString().toLowerCase();
+          const isBottomDock = (
+            className.includes('bottom') ||
+            className.includes('footer') ||
+            className.includes('dock') ||
+            className.includes('share') ||
+            className.includes('app-banner') ||
+            id.includes('bottom') ||
+            id.includes('footer') ||
+            id.includes('dock')
+          );
+          if (isBottomDock && !el.classList.contains('browseclean-suppress-dock')) {
+            el.classList.add('browseclean-suppress-dock');
+          }
+        }
+      });
+    }
+  }
+
+  function attachViewportReclaimListener() {
+    if (viewportListenerAttached) return;
+    viewportListenerAttached = true;
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          reclaimViewportRealEstate();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+  }
+
+  /**
    * Main Pipeline execution
    */
   function executeSweep() {
@@ -877,6 +972,8 @@
     enforceAutoplayPolicy();
     enableSelectionAndCopy();
     attachUrlCleaner();
+    attachViewportReclaimListener();
+    reclaimViewportRealEstate();
   }
 
   /**
