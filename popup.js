@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleLoginWalls = document.getElementById('toggleLoginWalls');
   const toggleCopy = document.getElementById('toggleCopy');
   const toggleCleanUrls = document.getElementById('toggleCleanUrls');
+  const toggleViewport = document.getElementById('toggleViewport');
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
@@ -39,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     cleanUrls: true,
     blockAntiAdblock: true,
     blockLoginWalls: true,
+    reclaimViewport: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -77,6 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (toggleLoginWalls) toggleLoginWalls.checked = !!activeSettings.blockLoginWalls;
     toggleCopy.checked = !!activeSettings.unlockCopy;
     toggleCleanUrls.checked = !!activeSettings.cleanUrls;
+    if (toggleViewport) toggleViewport.checked = !!activeSettings.reclaimViewport;
     toggleScroll.checked = !!activeSettings.restoreScroll;
     toggleAutoplay.checked = !!activeSettings.stopAutoplay;
     toggleSurveys.checked = !!activeSettings.blockSurveys;
@@ -155,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (toggleLoginWalls) toggleLoginWalls.addEventListener('change', () => { activeSettings.blockLoginWalls = toggleLoginWalls.checked; persistSettings(); });
   toggleCopy.addEventListener('change', () => { activeSettings.unlockCopy = toggleCopy.checked; persistSettings(); });
   toggleCleanUrls.addEventListener('change', () => { activeSettings.cleanUrls = toggleCleanUrls.checked; persistSettings(); });
+  if (toggleViewport) toggleViewport.addEventListener('change', () => { activeSettings.reclaimViewport = toggleViewport.checked; persistSettings(); });
   toggleScroll.addEventListener('change', () => { activeSettings.restoreScroll = toggleScroll.checked; persistSettings(); });
   toggleAutoplay.addEventListener('change', () => { activeSettings.stopAutoplay = toggleAutoplay.checked; persistSettings(); });
   toggleSurveys.addEventListener('change', () => { activeSettings.blockSurveys = toggleSurveys.checked; persistSettings(); });
