@@ -298,3 +298,35 @@ body[style*="overflow-y: hidden"] {
   outline-offset: -2px !important;
   cursor: crosshair !important;
 }
+
+/* ==========================================================================
+   8. VIEWPORT RECLAIM (Sticky Header & Floating Bar Shrinker)
+   ========================================================================== */
+.browseclean-compact-header {
+  max-height: 48px !important;
+  overflow: hidden !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  transition: max-height 0.22s ease, padding 0.22s ease, box-shadow 0.22s ease !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.browseclean-compact-header:hover,
+.browseclean-compact-header:focus-within {
+  max-height: 500px !important;
+  overflow: visible !important;
+}
+
+.browseclean-unstick {
+  position: absolute !important;
+}
+
+.browseclean-suppress-dock {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+}
