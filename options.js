@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const optLoginWalls = document.getElementById('opt-loginwalls');
   const optCopy = document.getElementById('opt-copy');
   const optCleanUrls = document.getElementById('opt-cleanurls');
+  const optViewport = document.getElementById('opt-viewport');
   const optScroll = document.getElementById('opt-scroll');
   const optAutoplay = document.getElementById('opt-autoplay');
   const optSurveys = document.getElementById('opt-surveys');
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cleanUrls: true,
     blockAntiAdblock: true,
     blockLoginWalls: true,
+    reclaimViewport: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -75,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (optLoginWalls) optLoginWalls.checked = !!currentSettings.blockLoginWalls;
       if (optCopy) optCopy.checked = !!currentSettings.unlockCopy;
       if (optCleanUrls) optCleanUrls.checked = !!currentSettings.cleanUrls;
+      if (optViewport) optViewport.checked = !!currentSettings.reclaimViewport;
       optScroll.checked = !!currentSettings.restoreScroll;
       optAutoplay.checked = !!currentSettings.stopAutoplay;
       optSurveys.checked = !!currentSettings.blockSurveys;
@@ -96,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (optLoginWalls) optLoginWalls.addEventListener('change', () => { currentSettings.blockLoginWalls = optLoginWalls.checked; saveSettings(); });
   if (optCopy) optCopy.addEventListener('change', () => { currentSettings.unlockCopy = optCopy.checked; saveSettings(); });
   if (optCleanUrls) optCleanUrls.addEventListener('change', () => { currentSettings.cleanUrls = optCleanUrls.checked; saveSettings(); });
+  if (optViewport) optViewport.addEventListener('change', () => { currentSettings.reclaimViewport = optViewport.checked; saveSettings(); });
   optScroll.addEventListener('change', () => { currentSettings.restoreScroll = optScroll.checked; saveSettings(); });
   optAutoplay.addEventListener('change', () => { currentSettings.stopAutoplay = optAutoplay.checked; saveSettings(); });
   optSurveys.addEventListener('change', () => { currentSettings.blockSurveys = optSurveys.checked; saveSettings(); });
