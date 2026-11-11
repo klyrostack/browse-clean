@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   cleanUrls: true,
   blockAntiAdblock: true,
   blockLoginWalls: true,
+  reclaimViewport: true,
   whitelistedDomains: [],
   customSelectors: []
 };
