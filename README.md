@@ -25,6 +25,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Forced Login Wall Destroyer**: Bypasses full-screen registration gates, unmasks hidden answers/reviews, and restores scrolling on Quora, Glassdoor, Pinterest, Reddit, Scribd, and SlideShare.
 * **Universal Selection & Right-Click Unlocker**: Bypasses contextmenu blocking, re-enables text selection, and prevents clipboard tracking hijacking.
 * **URL Tracker Cleaner**: Strips `utm_*`, `fbclid`, `gclid`, `si`, and other tracking parameters automatically when copying links.
+* **Viewport Reclaim Engine**: Compresses oversized sticky navigation bars and un-sticks floating announcement ribbons and bottom promotional docks on scroll.
 * **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
 * **Scroll Traps**: Clears inline `overflow: hidden`, `position: fixed`, and modal lock classes (`sp-message-open`, `modal-open`, `overflow-hidden`).
 * **Autoplay Media**: Pauses unprompted background video playback.
