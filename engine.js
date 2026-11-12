@@ -993,37 +993,63 @@
    * Engine Initialization
    */
   function startEngine() {
-    chrome.storage.local.get(['settings'], (res) => {
-      if (res && res.settings) {
-        config = Object.assign(config, res.settings);
-      }
-
-      if (config.whitelistedDomains && config.whitelistedDomains.includes(currentHostname)) {
-        isCleanActive = false;
+    chrome.runtime.sendMessage({ action: 'getEffectiveSettings' }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.settings) {
+        // Fallback to local storage if background worker is starting
+        chrome.storage.local.get(['settings'], (res) => {
+          if (res && res.settings) {
+            config = Object.assign(config, res.settings);
+          }
+          initializeEnginePipeline();
+        });
         return;
       }
 
-      executeSweep();
-
-      const root = document.documentElement || document;
-      observer.observe(root, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class', 'style']
-      });
-
-      let sweeps = 0;
-      const interval = setInterval(() => {
-        executeSweep();
-        sweeps++;
-        if (sweeps > 20) clearInterval(interval);
-      }, 500);
+      config = Object.assign(config, response.settings);
+      initializeEnginePipeline();
     });
+  }
+
+  function initializeEnginePipeline() {
+    if (config.whitelistedDomains && config.whitelistedDomains.includes(currentHostname)) {
+      isCleanActive = false;
+      return;
+    }
+
+    executeSweep();
+
+    const root = document.documentElement || document;
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+
+    let sweeps = 0;
+    const interval = setInterval(() => {
+      executeSweep();
+      sweeps++;
+      if (sweeps > 20) clearInterval(interval);
+    }, 500);
   }
 
   // Handle messages from popup / options
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.action === 'policyUpdated') {
+      if (msg.settings) {
+        config = Object.assign(config, msg.settings);
+      }
+      if (config.whitelistedDomains && config.whitelistedDomains.includes(currentHostname)) {
+        isCleanActive = false;
+      } else {
+        isCleanActive = true;
+        executeSweep();
+      }
+      sendResponse({ received: true });
+      return true;
+    }
+
     if (msg.action === 'getStatus') {
       sendResponse({
         enabled: isCleanActive,
