@@ -74,19 +74,41 @@ zip -r browseclean-v1.0.0.zip manifest.json cleaner.css engine.js background.js 
 ```
 browse-clean/
 ├── manifest.json       # Manifest V3 configuration
+├── managed_schema.json # Chrome Enterprise policy schema (draft-03)
 ├── cleaner.css        # Pre-paint stylesheet (runs at document_start)
 ├── engine.js          # DOM observer and smart reject clicker
-├── background.js      # Service worker for badge updates and local state
+├── background.js      # Service worker, managed policy resolver, telemetry
 ├── popup.html         # Toolbar popup interface
 ├── popup.css          # Minimalist dark theme styling
-├── popup.js           # Active tab controller
+├── popup.js           # Active tab controller & enterprise lock handler
 ├── options.html       # Whitelist and custom selector dashboard
-├── options.css        # Dashboard styling
+├── options.css        # Dashboard styling & managed environment badges
 ├── options.js         # Settings manager (hardened against DOM injection)
 ├── icons/             # 16px, 32px, 48px, 128px assets
 ├── LICENSE            # MIT License
 └── README.md          # Project documentation
 ```
+
+---
+
+## Chrome Enterprise Policy Deployment
+
+BrowseClean natively integrates with `chrome.storage.managed` via [`managed_schema.json`](managed_schema.json), allowing enterprise IT administrators to enforce organization-wide protection policies across fleet workstations.
+
+### Supported Policy Keys
+
+* `whitelistedDomains`: Array of mandatory corporate intranet domains (e.g. `["corp.internal", "jira.company.com"]`) that are permanently exempt from filtering.
+* `forcedLockedSettings`: Array of configuration keys that end-users are strictly prohibited from toggling.
+* Any standard module key (`blockCookies`, `cleanUrls`, `unlockCopy`, `blockAntiAdblock`, `reclaimViewport`) enforced by enterprise policy overrides local user preferences.
+
+### Deployment Channels
+
+* **Windows GPO / Active Directory Registry:**
+  `HKEY_LOCAL_MACHINE\Software\Policies\Google\Chrome\3rdparty\extensions\<extension-id>\policy`
+* **macOS Configuration Profiles (Jamf / MDM):**
+  Managed preferences payload targeting `com.google.Chrome.extensions.<extension-id>`.
+* **Google Admin Console:**
+  Upload `managed_schema.json` directly under **Devices > Chrome > Apps & extensions > Users & browsers**.
 
 ---
 
