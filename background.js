@@ -55,8 +55,70 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
+// Resolve effective settings taking Chrome Enterprise Managed Policy into account
+function resolveEffectiveSettings(callback) {
+  chrome.storage.local.get(['settings'], (localRes) => {
+    const local = localRes.settings || DEFAULT_SETTINGS;
+    if (chrome.storage && chrome.storage.managed) {
+      chrome.storage.managed.get(null, (managedSettings) => {
+        if (chrome.runtime.lastError || !managedSettings || Object.keys(managedSettings).length === 0) {
+          callback(local, [], false, {});
+          return;
+        }
+
+        const effective = Object.assign({}, local, managedSettings);
+
+        // Union whitelisted domains if defined in both
+        if (Array.isArray(managedSettings.whitelistedDomains) && Array.isArray(local.whitelistedDomains)) {
+          effective.whitelistedDomains = Array.from(new Set([
+            ...managedSettings.whitelistedDomains,
+            ...local.whitelistedDomains
+          ]));
+        }
+
+        const lockedKeys = Array.isArray(managedSettings.forcedLockedSettings)
+          ? managedSettings.forcedLockedSettings
+          : Object.keys(managedSettings);
+
+        callback(effective, lockedKeys, true, managedSettings);
+      });
+    } else {
+      callback(local, [], false, {});
+    }
+  });
+}
+
+// Listen for dynamic policy updates from enterprise MDM / GPO
+if (chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'managed') {
+      resolveEffectiveSettings((effective, lockedKeys, isManaged) => {
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach(tab => {
+            if (tab && tab.id) {
+              chrome.tabs.sendMessage(tab.id, {
+                action: 'policyUpdated',
+                settings: effective,
+                lockedKeys: lockedKeys,
+                isManaged: isManaged
+              }).catch(() => {});
+            }
+          });
+        });
+      });
+    }
+  });
+}
+
 // Telemetry & Badge Synchronization
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'getEffectiveSettings') {
+    resolveEffectiveSettings((settings, lockedKeys, isManaged) => {
+      sendResponse({ settings, lockedKeys, isManaged });
+    });
+    return true;
+  }
+
   if (message.action === 'updateCount') {
     const tabId = sender.tab ? sender.tab.id : null;
     const count = message.count || 0;
