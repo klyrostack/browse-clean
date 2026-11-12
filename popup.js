@@ -24,6 +24,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
+  const enterpriseBanner = document.getElementById('enterpriseBanner');
+
+  const toggleMap = {
+    blockCookies: toggleCookies,
+    blockNewsletters: toggleNewsletters,
+    blockChats: toggleChats,
+    unblurContent: toggleUnblur,
+    blockAntiAdblock: toggleAntiAdblock,
+    blockLoginWalls: toggleLoginWalls,
+    unlockCopy: toggleCopy,
+    cleanUrls: toggleCleanUrls,
+    reclaimViewport: toggleViewport,
+    restoreScroll: toggleScroll,
+    stopAutoplay: toggleAutoplay,
+    blockSurveys: toggleSurveys
+  };
 
   let activeTab = null;
   let activeHostname = '';
@@ -65,30 +81,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Load stored settings and stats
-  chrome.storage.local.get(['settings', 'stats'], (result) => {
-    if (result.settings) {
-      activeSettings = Object.assign(activeSettings, result.settings);
+  // Load stored settings and stats taking enterprise managed policy into account
+  chrome.runtime.sendMessage({ action: 'getEffectiveSettings' }, (effectiveRes) => {
+    let lockedKeys = [];
+    let isManaged = false;
+
+    if (effectiveRes && effectiveRes.settings) {
+      activeSettings = Object.assign(activeSettings, effectiveRes.settings);
+      lockedKeys = effectiveRes.lockedKeys || [];
+      isManaged = !!effectiveRes.isManaged;
     }
 
-    toggleCookies.checked = !!activeSettings.blockCookies;
-    toggleNewsletters.checked = !!activeSettings.blockNewsletters;
-    toggleChats.checked = !!activeSettings.blockChats;
-    toggleUnblur.checked = !!activeSettings.unblurContent;
-    if (toggleAntiAdblock) toggleAntiAdblock.checked = !!activeSettings.blockAntiAdblock;
-    if (toggleLoginWalls) toggleLoginWalls.checked = !!activeSettings.blockLoginWalls;
-    toggleCopy.checked = !!activeSettings.unlockCopy;
-    toggleCleanUrls.checked = !!activeSettings.cleanUrls;
-    if (toggleViewport) toggleViewport.checked = !!activeSettings.reclaimViewport;
-    toggleScroll.checked = !!activeSettings.restoreScroll;
-    toggleAutoplay.checked = !!activeSettings.stopAutoplay;
-    toggleSurveys.checked = !!activeSettings.blockSurveys;
+    if (isManaged && enterpriseBanner) {
+      enterpriseBanner.style.display = 'flex';
+    }
+
+    Object.keys(toggleMap).forEach(key => {
+      const el = toggleMap[key];
+      if (el) {
+        el.checked = !!activeSettings[key];
+        if (lockedKeys.includes(key)) {
+          el.disabled = true;
+          const row = el.closest('.filter-row');
+          if (row) {
+            row.classList.add('locked');
+            row.title = 'Enforced by organization policy';
+          }
+        }
+      }
+    });
 
     const isWhitelisted = activeSettings.whitelistedDomains && activeSettings.whitelistedDomains.includes(activeHostname);
     siteToggle.checked = !isWhitelisted;
     renderStatusBadge(!isWhitelisted);
 
-    if (result.stats && typeof result.stats.totalBlocked === 'number') {
+    if (lockedKeys.includes('whitelistedDomains') || (isManaged && isWhitelisted)) {
+      siteToggle.disabled = true;
+      const domainCard = siteToggle.closest('.domain-card');
+      if (domainCard) domainCard.title = 'Domain exemption enforced by organization policy';
+    }
+  });
+
+  chrome.storage.local.get(['stats'], (result) => {
+    if (result && result.stats && typeof result.stats.totalBlocked === 'number') {
       totalCountEl.textContent = result.stats.totalBlocked.toLocaleString();
     }
   });
