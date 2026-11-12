@@ -34,6 +34,9 @@
       "description": "Activate Element Zapper"
     }
   },
+  "storage": {
+    "managed_schema": "managed_schema.json"
+  },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
