@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-03/schema#",
+  "type": "object",
+  "properties": {
+    "blockCookies": {
+      "title": "Block Cookie Walls",
+      "description": "Enforce automatic rejection and suppression of cookie consent banners.",
+      "type": "boolean"
+    },
+    "blockNewsletters": {
+      "title": "Block Newsletter Popups",
+      "description": "Enforce suppression of lead-generation dialogs and newsletter popups.",
+      "type": "boolean"
+    },
+    "blockChats": {
+      "title": "Block Customer Chat Widgets",
+      "description": "Enforce hiding persistent live chat bubble widgets.",
+      "type": "boolean"
+    },
+    "restoreScroll": {
+      "title": "Restore Scroll Locks",
+      "description": "Enforce automatic clearing of document viewport overflow locks.",
+      "type": "boolean"
+    },
+    "stopAutoplay": {
+      "title": "Pause Autoplay Media",
+      "description": "Enforce pausing unprompted background HTML5 video playback.",
+      "type": "boolean"
+    },
+    "blockSurveys": {
+      "title": "Block Surveys",
+      "description": "Enforce suppression of intrusive feedback and survey dialogs.",
+      "type": "boolean"
+    },
+    "unblurContent": {
+      "title": "Unblur Soft Paywalls",
+      "description": "Enforce removal of CSS blur filters and height restrictions on articles.",
+      "type": "boolean"
+    },
+    "unlockCopy": {
+      "title": "Unlock Copy & Context Menus",
+      "description": "Enforce restoration of right-click context menus and text selection.",
+      "type": "boolean"
+    },
+    "cleanUrls": {
+      "title": "Clean Tracking URLs",
+      "description": "Enforce removal of tracking query parameters on copy.",
+      "type": "boolean"
+    },
+    "blockAntiAdblock": {
+      "title": "Block Anti-Adblock Walls",
+      "description": "Enforce neutralization of Admiral and adblock detection modals.",
+      "type": "boolean"
+    },
+    "blockLoginWalls": {
+      "title": "Block Forced Login Walls",
+      "description": "Enforce neutralization of forced registration walls on Quora, Glassdoor, and Pinterest.",
+      "type": "boolean"
+    },
+    "reclaimViewport": {
+      "title": "Viewport Reclaim Engine",
+      "description": "Enforce compact sticky headers and un-sticking of floating promotional ribbons.",
+      "type": "boolean"
+    },
+    "whitelistedDomains": {
+      "title": "Corporate Whitelisted Domains",
+      "description": "List of domains exempt from decluttering (e.g. internal intranets).",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "forcedLockedSettings": {
+      "title": "Prohibited User Modification Keys",
+      "description": "List of settings that end-users are strictly prohibited from changing.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
