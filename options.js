@@ -30,6 +30,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const optScroll = document.getElementById('opt-scroll');
   const optAutoplay = document.getElementById('opt-autoplay');
   const optSurveys = document.getElementById('opt-surveys');
+  const enterpriseStatus = document.getElementById('enterpriseStatus');
+
+  let lockedKeys = [];
+  let isManaged = false;
+
+  const optMap = {
+    blockCookies: optCookies,
+    blockNewsletters: optNewsletters,
+    blockChats: optChats,
+    unblurContent: optUnblur,
+    blockAntiAdblock: optAntiAdblock,
+    blockLoginWalls: optLoginWalls,
+    unlockCopy: optCopy,
+    cleanUrls: optCleanUrls,
+    reclaimViewport: optViewport,
+    restoreScroll: optScroll,
+    stopAutoplay: optAutoplay,
+    blockSurveys: optSurveys
+  };
 
   const whitelistInput = document.getElementById('whitelistInput');
   const addWhitelistBtn = document.getElementById('addWhitelistBtn');
@@ -64,23 +83,38 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function loadSettings() {
-    chrome.storage.local.get(['settings'], (res) => {
+    chrome.runtime.sendMessage({ action: 'getEffectiveSettings' }, (res) => {
       if (res && res.settings) {
         currentSettings = Object.assign(currentSettings, res.settings);
+        lockedKeys = res.lockedKeys || [];
+        isManaged = !!res.isManaged;
       }
 
-      optCookies.checked = !!currentSettings.blockCookies;
-      optNewsletters.checked = !!currentSettings.blockNewsletters;
-      optChats.checked = !!currentSettings.blockChats;
-      if (optUnblur) optUnblur.checked = !!currentSettings.unblurContent;
-      if (optAntiAdblock) optAntiAdblock.checked = !!currentSettings.blockAntiAdblock;
-      if (optLoginWalls) optLoginWalls.checked = !!currentSettings.blockLoginWalls;
-      if (optCopy) optCopy.checked = !!currentSettings.unlockCopy;
-      if (optCleanUrls) optCleanUrls.checked = !!currentSettings.cleanUrls;
-      if (optViewport) optViewport.checked = !!currentSettings.reclaimViewport;
-      optScroll.checked = !!currentSettings.restoreScroll;
-      optAutoplay.checked = !!currentSettings.stopAutoplay;
-      optSurveys.checked = !!currentSettings.blockSurveys;
+      if (isManaged && enterpriseStatus) {
+        enterpriseStatus.style.display = 'flex';
+      }
+
+      Object.keys(optMap).forEach(key => {
+        const el = optMap[key];
+        if (el) {
+          el.checked = !!currentSettings[key];
+          if (lockedKeys.includes(key)) {
+            el.disabled = true;
+            const row = el.closest('.row');
+            if (row) {
+              row.classList.add('locked');
+              row.title = 'Enforced by enterprise policy';
+              const titleEl = row.querySelector('.row-title');
+              if (titleEl && !titleEl.querySelector('.badge-managed')) {
+                const badge = document.createElement('span');
+                badge.className = 'badge-managed';
+                badge.textContent = 'Managed';
+                titleEl.appendChild(badge);
+              }
+            }
+          }
+        }
+      });
 
       renderWhitelist();
       renderCustomRules();
@@ -123,18 +157,26 @@ document.addEventListener('DOMContentLoaded', () => {
       const span = document.createElement('span');
       span.textContent = domain;
 
-      const delBtn = document.createElement('button');
-      delBtn.className = 'delete-btn';
-      delBtn.title = 'Remove';
-      delBtn.textContent = '×';
-      delBtn.addEventListener('click', () => {
-        currentSettings.whitelistedDomains = currentSettings.whitelistedDomains.filter(d => d !== domain);
-        saveSettings();
-        renderWhitelist();
-      });
+      if (isManaged && lockedKeys.includes('whitelistedDomains')) {
+        li.classList.add('managed-item');
+        const badge = document.createElement('span');
+        badge.className = 'badge-managed';
+        badge.textContent = 'Enforced';
+        span.appendChild(badge);
+      } else {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.title = 'Remove';
+        delBtn.textContent = '×';
+        delBtn.addEventListener('click', () => {
+          currentSettings.whitelistedDomains = currentSettings.whitelistedDomains.filter(d => d !== domain);
+          saveSettings();
+          renderWhitelist();
+        });
+        li.appendChild(delBtn);
+      }
 
       li.appendChild(span);
-      li.appendChild(delBtn);
       whitelistUl.appendChild(li);
     });
   }
