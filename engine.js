@@ -32,6 +32,7 @@
     blockAntiAdblock: true,
     blockLoginWalls: true,
     reclaimViewport: true,
+    blockSessionSpies: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -224,6 +225,30 @@
     'div[id*="signup-wall" i]',
     'div[class*="auth-modal" i]',
     'div[id*="auth-modal" i]'
+  ];
+
+  // Session Replay & Keystroke Spy tracking signatures (DLP)
+  const SESSION_SPY_DOMAINS = [
+    'static.hotjar.com',
+    'script.hotjar.com',
+    'fullstory.com',
+    'cdn.logrocket.io',
+    'cdn.lr-ingest.io',
+    'clarity.ms',
+    'smartlook.com',
+    'inspectlet.com',
+    'mouseflow.com',
+    'crazyegg.com',
+    'luckyorange.net'
+  ];
+
+  const SESSION_SPY_CONTAINERS = [
+    'iframe[id*="_hjRemoteVarsFrame"]',
+    'iframe[name*="_hjRemoteVarsFrame"]',
+    '#_hj_feedback_container',
+    'div[class*="hotjar-widget"]',
+    'div[id*="clarity-"]',
+    'div[class*="clarity-"]'
   ];
 
   // Scroll lock classes to neutralize
@@ -956,6 +981,69 @@
   }
 
   /**
+   * 13. Session Replay & DOM Spy Neutralizer (Data Loss Prevention / DLP)
+   */
+  let dlpStubInjected = false;
+  function injectDLPPageStubs() {
+    if (dlpStubInjected || !config.blockSessionSpies) return;
+    dlpStubInjected = true;
+    try {
+      const script = document.createElement('script');
+      script.textContent = `
+        (() => {
+          const noop = () => {};
+          const noopProxy = new Proxy(noop, {
+            get: () => noopProxy,
+            apply: () => undefined
+          });
+          const freezeGlobal = (name) => {
+            try {
+              Object.defineProperty(window, name, {
+                value: noopProxy,
+                writable: false,
+                configurable: false
+              });
+            } catch (e) {}
+          };
+          ['hj', '_hjSettings', 'FS', 'LogRocket', 'clarity', 'smartlook', '__insp', '_mfq', 'CE2'].forEach(freezeGlobal);
+        })();
+      `;
+      (document.head || document.documentElement).appendChild(script);
+      script.remove();
+    } catch (e) {}
+  }
+
+  function sweepSessionSpies() {
+    if (!config.blockSessionSpies) return;
+    injectDLPPageStubs();
+
+    // 1. Remove tracking containers and iframes
+    SESSION_SPY_CONTAINERS.forEach(sel => {
+      try {
+        const nodes = document.querySelectorAll(sel);
+        nodes.forEach(n => eradicateElement(n, 'session-spy'));
+      } catch (e) {}
+    });
+
+    // 2. Intercept and neutralize surveillance scripts in DOM
+    try {
+      const scripts = document.querySelectorAll('script[src]');
+      scripts.forEach(s => {
+        if (s.dataset.bcDlpScrubbed) return;
+        const src = (s.src || '').toLowerCase();
+        const isSpy = SESSION_SPY_DOMAINS.some(d => src.includes(d));
+        if (isSpy) {
+          s.dataset.bcDlpScrubbed = 'true';
+          s.type = 'javascript/blocked';
+          if (s.parentNode) s.parentNode.removeChild(s);
+          blockedCount++;
+          syncStats();
+        }
+      });
+    } catch (e) {}
+  }
+
+  /**
    * Main Pipeline execution
    */
   function executeSweep() {
@@ -967,6 +1055,7 @@
     sweepPaywallBlurs();
     sweepAntiAdblockWalls();
     sweepLoginWalls();
+    sweepSessionSpies();
     sweepCustomSelectors();
     breakScrollLock();
     enforceAutoplayPolicy();
@@ -1016,6 +1105,7 @@
       return;
     }
 
+    injectDLPPageStubs();
     executeSweep();
 
     const root = document.documentElement || document;
