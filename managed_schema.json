@@ -62,6 +62,11 @@
       "description": "Enforce compact sticky headers and un-sticking of floating promotional ribbons.",
       "type": "boolean"
     },
+    "blockSessionSpies": {
+      "title": "Block Session Replay & DOM Spies",
+      "description": "Enforce Data Loss Prevention by neutralizing Hotjar, FullStory, LogRocket, and Clarity keystroke recorders.",
+      "type": "boolean"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
