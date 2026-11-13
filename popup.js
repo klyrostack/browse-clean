@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleCopy = document.getElementById('toggleCopy');
   const toggleCleanUrls = document.getElementById('toggleCleanUrls');
   const toggleViewport = document.getElementById('toggleViewport');
+  const toggleSessionSpies = document.getElementById('toggleSessionSpies');
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
@@ -36,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     unlockCopy: toggleCopy,
     cleanUrls: toggleCleanUrls,
     reclaimViewport: toggleViewport,
+    blockSessionSpies: toggleSessionSpies,
     restoreScroll: toggleScroll,
     stopAutoplay: toggleAutoplay,
     blockSurveys: toggleSurveys
@@ -57,6 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     blockAntiAdblock: true,
     blockLoginWalls: true,
     reclaimViewport: true,
+    blockSessionSpies: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -194,6 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   toggleCopy.addEventListener('change', () => { activeSettings.unlockCopy = toggleCopy.checked; persistSettings(); });
   toggleCleanUrls.addEventListener('change', () => { activeSettings.cleanUrls = toggleCleanUrls.checked; persistSettings(); });
   if (toggleViewport) toggleViewport.addEventListener('change', () => { activeSettings.reclaimViewport = toggleViewport.checked; persistSettings(); });
+  if (toggleSessionSpies) toggleSessionSpies.addEventListener('change', () => { activeSettings.blockSessionSpies = toggleSessionSpies.checked; persistSettings(); });
   toggleScroll.addEventListener('change', () => { activeSettings.restoreScroll = toggleScroll.checked; persistSettings(); });
   toggleAutoplay.addEventListener('change', () => { activeSettings.stopAutoplay = toggleAutoplay.checked; persistSettings(); });
   toggleSurveys.addEventListener('change', () => { activeSettings.blockSurveys = toggleSurveys.checked; persistSettings(); });
