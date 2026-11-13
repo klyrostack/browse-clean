@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const optCopy = document.getElementById('opt-copy');
   const optCleanUrls = document.getElementById('opt-cleanurls');
   const optViewport = document.getElementById('opt-viewport');
+  const optSessionSpies = document.getElementById('opt-sessionspies');
   const optScroll = document.getElementById('opt-scroll');
   const optAutoplay = document.getElementById('opt-autoplay');
   const optSurveys = document.getElementById('opt-surveys');
@@ -45,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     unlockCopy: optCopy,
     cleanUrls: optCleanUrls,
     reclaimViewport: optViewport,
+    blockSessionSpies: optSessionSpies,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
     blockSurveys: optSurveys
@@ -78,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     blockAntiAdblock: true,
     blockLoginWalls: true,
     reclaimViewport: true,
+    blockSessionSpies: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -134,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (optCopy) optCopy.addEventListener('change', () => { currentSettings.unlockCopy = optCopy.checked; saveSettings(); });
   if (optCleanUrls) optCleanUrls.addEventListener('change', () => { currentSettings.cleanUrls = optCleanUrls.checked; saveSettings(); });
   if (optViewport) optViewport.addEventListener('change', () => { currentSettings.reclaimViewport = optViewport.checked; saveSettings(); });
+  if (optSessionSpies) optSessionSpies.addEventListener('change', () => { currentSettings.blockSessionSpies = optSessionSpies.checked; saveSettings(); });
   optScroll.addEventListener('change', () => { currentSettings.restoreScroll = optScroll.checked; saveSettings(); });
   optAutoplay.addEventListener('change', () => { currentSettings.stopAutoplay = optAutoplay.checked; saveSettings(); });
   optSurveys.addEventListener('change', () => { currentSettings.blockSurveys = optSurveys.checked; saveSettings(); });
