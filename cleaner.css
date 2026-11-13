@@ -330,3 +330,24 @@ body[style*="overflow-y: hidden"] {
   max-height: 0 !important;
   overflow: hidden !important;
 }
+
+/* ==========================================================================
+   9. SESSION REPLAY & DOM SPY SURVEILLANCE CONTAINERS (DLP)
+   ========================================================================== */
+iframe[id*="_hjRemoteVarsFrame"],
+iframe[name*="_hjRemoteVarsFrame"],
+#_hj_feedback_container,
+div[class*="hotjar-widget"],
+div[id*="clarity-"],
+div[class*="clarity-"],
+div[id*="fs-debug"],
+div[class*="fs-mask"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  z-index: -99999 !important;
+}
