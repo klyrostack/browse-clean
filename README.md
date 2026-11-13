@@ -26,6 +26,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Universal Selection & Right-Click Unlocker**: Bypasses contextmenu blocking, re-enables text selection, and prevents clipboard tracking hijacking.
 * **URL Tracker Cleaner**: Strips `utm_*`, `fbclid`, `gclid`, `si`, and other tracking parameters automatically when copying links.
 * **Viewport Reclaim Engine**: Compresses oversized sticky navigation bars and un-sticks floating announcement ribbons and bottom promotional docks on scroll.
+* **Session Replay & DOM Spy Neutralizer (DLP)**: Stubs and neutralizes Hotjar, FullStory, LogRocket, Clarity, and keystroke surveillance recorders to stop unauthorized corporate data harvesting.
 * **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
 * **Scroll Traps**: Clears inline `overflow: hidden`, `position: fixed`, and modal lock classes (`sp-message-open`, `modal-open`, `overflow-hidden`).
 * **Autoplay Media**: Pauses unprompted background video playback.
@@ -99,7 +100,7 @@ BrowseClean natively integrates with `chrome.storage.managed` via [`managed_sche
 
 * `whitelistedDomains`: Array of mandatory corporate intranet domains (e.g. `["corp.internal", "jira.company.com"]`) that are permanently exempt from filtering.
 * `forcedLockedSettings`: Array of configuration keys that end-users are strictly prohibited from toggling.
-* Any standard module key (`blockCookies`, `cleanUrls`, `unlockCopy`, `blockAntiAdblock`, `reclaimViewport`) enforced by enterprise policy overrides local user preferences.
+* Any standard module key (`blockCookies`, `cleanUrls`, `unlockCopy`, `blockAntiAdblock`, `reclaimViewport`, `blockSessionSpies`) enforced by enterprise policy overrides local user preferences.
 
 ### Deployment Channels
 
