@@ -28,10 +28,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const optCleanUrls = document.getElementById('opt-cleanurls');
   const optViewport = document.getElementById('opt-viewport');
   const optSessionSpies = document.getElementById('opt-sessionspies');
+  const optAudit = document.getElementById('opt-audit');
   const optScroll = document.getElementById('opt-scroll');
   const optAutoplay = document.getElementById('opt-autoplay');
   const optSurveys = document.getElementById('opt-surveys');
   const enterpriseStatus = document.getElementById('enterpriseStatus');
+
+  const auditCountVal = document.getElementById('auditCountVal');
+  const auditHashVal = document.getElementById('auditHashVal');
+  const exportComplianceJsonBtn = document.getElementById('exportComplianceJsonBtn');
+  const exportComplianceCsvBtn = document.getElementById('exportComplianceCsvBtn');
+  const clearAuditLogBtn = document.getElementById('clearAuditLogBtn');
 
   let lockedKeys = [];
   let isManaged = false;
@@ -47,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cleanUrls: optCleanUrls,
     reclaimViewport: optViewport,
     blockSessionSpies: optSessionSpies,
+    auditLogging: optAudit,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
     blockSurveys: optSurveys
@@ -81,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
     blockLoginWalls: true,
     reclaimViewport: true,
     blockSessionSpies: true,
+    auditLogging: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -138,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (optCleanUrls) optCleanUrls.addEventListener('change', () => { currentSettings.cleanUrls = optCleanUrls.checked; saveSettings(); });
   if (optViewport) optViewport.addEventListener('change', () => { currentSettings.reclaimViewport = optViewport.checked; saveSettings(); });
   if (optSessionSpies) optSessionSpies.addEventListener('change', () => { currentSettings.blockSessionSpies = optSessionSpies.checked; saveSettings(); });
+  if (optAudit) optAudit.addEventListener('change', () => { currentSettings.auditLogging = optAudit.checked; saveSettings(); });
   optScroll.addEventListener('change', () => { currentSettings.restoreScroll = optScroll.checked; saveSettings(); });
   optAutoplay.addEventListener('change', () => { currentSettings.stopAutoplay = optAutoplay.checked; saveSettings(); });
   optSurveys.addEventListener('change', () => { currentSettings.blockSurveys = optSurveys.checked; saveSettings(); });
@@ -297,5 +307,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Cryptographic Audit & Compliance Management
+  function loadAuditMetrics() {
+    chrome.runtime.sendMessage({ action: 'getAuditLog' }, (res) => {
+      if (res) {
+        if (auditCountVal) auditCountVal.textContent = (res.count || 0).toLocaleString();
+        if (auditHashVal) {
+          if (res.count > 0 && res.sha256) {
+            auditHashVal.textContent = res.sha256.slice(0, 16) + '...' + res.sha256.slice(-8);
+            auditHashVal.title = res.sha256;
+          } else {
+            auditHashVal.textContent = 'Verified Clean (0 Events)';
+          }
+        }
+      }
+    });
+  }
+
+  if (exportComplianceJsonBtn) {
+    exportComplianceJsonBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'generateCompliancePackage' }, (res) => {
+        if (!res || !res.package) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.package, null, 2));
+        const a = document.createElement('a');
+        a.setAttribute("href", dataStr);
+        a.setAttribute("download", `browseclean-compliance-audit-${Date.now()}.json`);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+    });
+  }
+
+  if (exportComplianceCsvBtn) {
+    exportComplianceCsvBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'getAuditLog' }, (res) => {
+        const log = (res && res.log) ? res.log : [];
+        const headers = ['Timestamp', 'Domain', 'Category', 'Action', 'Details'];
+        const csvRows = [headers.join(',')];
+
+        log.forEach(item => {
+          const row = [
+            `"${(item.timestamp || '').replace(/"/g, '""')}"`,
+            `"${(item.domain || '').replace(/"/g, '""')}"`,
+            `"${(item.category || '').replace(/"/g, '""')}"`,
+            `"${(item.action || '').replace(/"/g, '""')}"`,
+            `"${(item.details || '').replace(/"/g, '""')}"`
+          ];
+          csvRows.push(row.join(','));
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join('\n'));
+        const a = document.createElement('a');
+        a.setAttribute("href", csvContent);
+        a.setAttribute("download", `browseclean-audit-log-${Date.now()}.csv`);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+    });
+  }
+
+  if (clearAuditLogBtn) {
+    clearAuditLogBtn.addEventListener('click', () => {
+      if (confirm('Permanently clear all local cryptographic audit records?')) {
+        chrome.runtime.sendMessage({ action: 'clearAuditLog' }, () => {
+          loadAuditMetrics();
+        });
+      }
+    });
+  }
+
   loadSettings();
+  loadAuditMetrics();
 });
