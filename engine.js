@@ -33,6 +33,7 @@
     blockLoginWalls: true,
     reclaimViewport: true,
     blockSessionSpies: true,
+    auditLogging: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -269,6 +270,33 @@
   ];
 
   /**
+   * Cryptographic Audit Logging dispatcher (Compliance & DLP)
+   */
+  const lastLoggedEntries = new Set();
+  function logIntervention(category, action, details) {
+    if (!config.auditLogging) return;
+    const key = `${category}:${action}:${details || ''}`;
+    if (lastLoggedEntries.has(key)) return;
+    lastLoggedEntries.add(key);
+
+    if (lastLoggedEntries.size > 200) {
+      lastLoggedEntries.clear();
+    }
+
+    try {
+      chrome.runtime.sendMessage({
+        action: 'recordAuditLog',
+        entry: {
+          domain: currentHostname,
+          category: category,
+          action: action,
+          details: details ? details.slice(0, 120) : ''
+        }
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  /**
    * Safe element removal with telemetry
    */
   function eradicateElement(el, category) {
@@ -288,6 +316,8 @@
 
       blockedCount++;
       syncStats();
+      const elIdentifier = el.id ? `#${el.id}` : (el.className && typeof el.className === 'string' ? `.${el.className.split(' ')[0]}` : (el.tagName ? el.tagName.toLowerCase() : 'element'));
+      logIntervention(category || 'element', 'suppressed', elIdentifier);
       return true;
     } catch (e) {
       return false;
@@ -695,6 +725,7 @@
             e.stopImmediatePropagation();
             e.preventDefault();
             e.clipboardData.setData('text/plain', parsed.toString());
+            logIntervention('url-tracker', 'sanitized', parsed.hostname);
           }
         } catch (err) {}
       }
@@ -1038,6 +1069,7 @@
           if (s.parentNode) s.parentNode.removeChild(s);
           blockedCount++;
           syncStats();
+          logIntervention('session-spy', 'neutralized', src.split('?')[0]);
         }
       });
     } catch (e) {}
