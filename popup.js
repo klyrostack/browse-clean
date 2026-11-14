@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleCleanUrls = document.getElementById('toggleCleanUrls');
   const toggleViewport = document.getElementById('toggleViewport');
   const toggleSessionSpies = document.getElementById('toggleSessionSpies');
+  const toggleAudit = document.getElementById('toggleAudit');
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
@@ -38,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     cleanUrls: toggleCleanUrls,
     reclaimViewport: toggleViewport,
     blockSessionSpies: toggleSessionSpies,
+    auditLogging: toggleAudit,
     restoreScroll: toggleScroll,
     stopAutoplay: toggleAutoplay,
     blockSurveys: toggleSurveys
@@ -60,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     blockLoginWalls: true,
     reclaimViewport: true,
     blockSessionSpies: true,
+    auditLogging: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -198,6 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   toggleCleanUrls.addEventListener('change', () => { activeSettings.cleanUrls = toggleCleanUrls.checked; persistSettings(); });
   if (toggleViewport) toggleViewport.addEventListener('change', () => { activeSettings.reclaimViewport = toggleViewport.checked; persistSettings(); });
   if (toggleSessionSpies) toggleSessionSpies.addEventListener('change', () => { activeSettings.blockSessionSpies = toggleSessionSpies.checked; persistSettings(); });
+  if (toggleAudit) toggleAudit.addEventListener('change', () => { activeSettings.auditLogging = toggleAudit.checked; persistSettings(); });
   toggleScroll.addEventListener('change', () => { activeSettings.restoreScroll = toggleScroll.checked; persistSettings(); });
   toggleAutoplay.addEventListener('change', () => { activeSettings.stopAutoplay = toggleAutoplay.checked; persistSettings(); });
   toggleSurveys.addEventListener('change', () => { activeSettings.blockSurveys = toggleSurveys.checked; persistSettings(); });
