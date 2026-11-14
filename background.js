@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   blockLoginWalls: true,
   reclaimViewport: true,
   blockSessionSpies: true,
+  auditLogging: true,
   whitelistedDomains: [],
   customSelectors: []
 };
@@ -111,11 +112,90 @@ if (chrome.storage && chrome.storage.onChanged) {
   });
 }
 
-// Telemetry & Badge Synchronization
+// Cryptographic Hash Utility (SHA-256 via Web Crypto API)
+async function computeSha256(str) {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Telemetry, Audit Logging & Badge Synchronization
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getEffectiveSettings') {
     resolveEffectiveSettings((settings, lockedKeys, isManaged) => {
       sendResponse({ settings, lockedKeys, isManaged });
+    });
+    return true;
+  }
+
+  // Cryptographic Audit Logging (Compliance & DLP)
+  if (message.action === 'recordAuditLog') {
+    resolveEffectiveSettings((settings) => {
+      if (!settings.auditLogging) {
+        sendResponse({ ignored: true });
+        return;
+      }
+      chrome.storage.local.get(['auditLog'], (res) => {
+        let log = res.auditLog || [];
+        const entry = Object.assign({
+          id: (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+          timestamp: new Date().toISOString()
+        }, message.entry);
+
+        log.unshift(entry);
+        if (log.length > 1000) {
+          log = log.slice(0, 1000);
+        }
+        chrome.storage.local.set({ auditLog: log }, () => {
+          sendResponse({ recorded: true, count: log.length });
+        });
+      });
+    });
+    return true;
+  }
+
+  if (message.action === 'getAuditLog') {
+    chrome.storage.local.get(['auditLog'], async (res) => {
+      const log = res.auditLog || [];
+      const hash = await computeSha256(JSON.stringify(log));
+      sendResponse({ log, count: log.length, sha256: hash });
+    });
+    return true;
+  }
+
+  if (message.action === 'clearAuditLog') {
+    chrome.storage.local.set({ auditLog: [] }, () => {
+      sendResponse({ cleared: true });
+    });
+    return true;
+  }
+
+  if (message.action === 'generateCompliancePackage') {
+    chrome.storage.local.get(['auditLog', 'stats', 'settings'], async (res) => {
+      const log = res.auditLog || [];
+      const stats = res.stats || { totalBlocked: 0, sitesCleaned: 0 };
+      const rawPayload = JSON.stringify(log);
+      const sha256 = await computeSha256(rawPayload);
+
+      const compliancePackage = {
+        complianceStandard: 'BrowseClean Cryptographic Audit Spec v1.0',
+        generatedAt: new Date().toISOString(),
+        extensionVersion: chrome.runtime.getManifest().version,
+        environment: 'Local Client-Side Sandbox (Zero Outbound Exfiltration)',
+        cryptographicProof: {
+          algorithm: 'SHA-256',
+          digest: sha256
+        },
+        metrics: {
+          totalLoggedInterventions: log.length,
+          allTimeInterventions: stats.totalBlocked || 0
+        },
+        auditTrail: log
+      };
+
+      sendResponse({ package: compliancePackage, sha256 });
     });
     return true;
   }
