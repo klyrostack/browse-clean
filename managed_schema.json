@@ -67,6 +67,11 @@
       "description": "Enforce Data Loss Prevention by neutralizing Hotjar, FullStory, LogRocket, and Clarity keystroke recorders.",
       "type": "boolean"
     },
+    "auditLogging": {
+      "title": "Audit Logging & Compliance",
+      "description": "Enforce local tamper-evident cryptographic audit logging of all stripped trackers and suppressed dialogs.",
+      "type": "boolean"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
