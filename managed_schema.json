@@ -72,6 +72,11 @@
       "description": "Enforce local tamper-evident cryptographic audit logging of all stripped trackers and suppressed dialogs.",
       "type": "boolean"
     },
+    "antiTamperDlp": {
+      "title": "Anti-Tamper & Form DLP Shield",
+      "description": "Enforce client-side Data Loss Prevention on sensitive inputs and isolate core DOM APIs against prototype tampering.",
+      "type": "boolean"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
