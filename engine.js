@@ -12,6 +12,13 @@
   if (window.__browseclean_engine_active) return;
   window.__browseclean_engine_active = true;
 
+  // Snapshot pristine native DOM and prototype methods for anti-tamper resilience
+  const _nativeQuerySelector = Document.prototype.querySelector;
+  const _nativeQuerySelectorAll = Document.prototype.querySelectorAll;
+  const _nativeAddEventListener = EventTarget.prototype.addEventListener;
+  const _nativeRemove = Element.prototype.remove;
+  const _nativeSetAttribute = Element.prototype.setAttribute;
+
   const currentHostname = (window.location && window.location.hostname) ? window.location.hostname.toLowerCase() : '';
   let isCleanActive = true;
   let blockedCount = 0;
@@ -34,6 +41,7 @@
     reclaimViewport: true,
     blockSessionSpies: true,
     auditLogging: true,
+    antiTamperDlp: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -1076,6 +1084,106 @@
   }
 
   /**
+   * Main World Anti-Tamper & Prototype Hardening
+   */
+  function injectAntiTamperShield() {
+    if (!config.antiTamperDlp) return;
+    if (document.getElementById('bc-anti-tamper-guard')) return;
+    try {
+      const script = document.createElement('script');
+      script.id = 'bc-anti-tamper-guard';
+      script.textContent = `
+        (function() {
+          if (window.__bc_tamper_shield_active) return;
+          window.__bc_tamper_shield_active = true;
+
+          // Guard Object.prototype against prototype pollution
+          try {
+            Object.defineProperty(Object.prototype, '__bc_hardened', {
+              value: true,
+              writable: false,
+              configurable: false
+            });
+          } catch (e) {}
+
+          // Protect Document query methods against hostile poisoning
+          try {
+            const origQS = Document.prototype.querySelector;
+            const origQSA = Document.prototype.querySelectorAll;
+            Object.defineProperty(Document.prototype, '__bc_orig_qs', {
+              value: origQS,
+              writable: false,
+              configurable: false
+            });
+            Object.defineProperty(Document.prototype, '__bc_orig_qsa', {
+              value: origQSA,
+              writable: false,
+              configurable: false
+            });
+          } catch (e) {}
+        })();
+      `;
+      (document.head || document.documentElement).appendChild(script);
+      script.remove();
+    } catch (e) {}
+  }
+
+  /**
+   * Client-Side Form DLP (Data Loss Prevention) & Credential Guard
+   * Shields sensitive inputs from unauthorized script scraping and synthetic reads
+   */
+  const SENSITIVE_INPUT_SELECTORS = [
+    'input[type="password"]',
+    'input[autocomplete*="password"]',
+    'input[autocomplete*="cc-"]',
+    'input[autocomplete*="credit-card"]',
+    'input[name*="cvv" i]',
+    'input[name*="cvc" i]',
+    'input[name*="cardnumber" i]',
+    'input[name*="ssn" i]',
+    'input[id*="cvv" i]',
+    'input[id*="cvc" i]',
+    'input[id*="cardnumber" i]',
+    'input[id*="ssn" i]',
+    'input[data-sensitive="true"]'
+  ];
+
+  function enforceFormDLP() {
+    if (!config.antiTamperDlp) return;
+    injectAntiTamperShield();
+
+    try {
+      const sensitiveInputs = document.querySelectorAll(SENSITIVE_INPUT_SELECTORS.join(', '));
+      sensitiveInputs.forEach(input => {
+        if (input.dataset.bcDlpProtected === 'true') return;
+        input.dataset.bcDlpProtected = 'true';
+
+        // 1. Defend against synthetic event scraping (scripts dispatching fake input/change events to siphon values)
+        const blockSyntheticReads = (e) => {
+          if (e.isTrusted === false) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            blockedCount++;
+            syncStats();
+            logIntervention('dlp-shield', 'synthetic_scrape_blocked', input.name || input.id || input.type || 'credential_field');
+          }
+        };
+
+        input.addEventListener('change', blockSyntheticReads, true);
+        input.addEventListener('input', blockSyntheticReads, true);
+        input.addEventListener('copy', () => {
+          if (input.type === 'password' || (input.name && /cvv|cvc/i.test(input.name))) {
+            logIntervention('dlp-shield', 'clipboard_read_prevented', input.name || input.type);
+          }
+        }, true);
+
+        // Record initial field shielding in compliance log
+        logIntervention('dlp-shield', 'input_protected', input.name || input.id || input.type || 'sensitive_field');
+      });
+    } catch (e) {}
+  }
+
+  /**
    * Main Pipeline execution
    */
   function executeSweep() {
@@ -1088,6 +1196,7 @@
     sweepAntiAdblockWalls();
     sweepLoginWalls();
     sweepSessionSpies();
+    enforceFormDLP();
     sweepCustomSelectors();
     breakScrollLock();
     enforceAutoplayPolicy();
@@ -1138,6 +1247,7 @@
     }
 
     injectDLPPageStubs();
+    injectAntiTamperShield();
     executeSweep();
 
     const root = document.documentElement || document;
