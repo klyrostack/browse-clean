@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleViewport = document.getElementById('toggleViewport');
   const toggleSessionSpies = document.getElementById('toggleSessionSpies');
   const toggleAudit = document.getElementById('toggleAudit');
+  const toggleAntiTamper = document.getElementById('toggleAntiTamper');
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
@@ -40,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     reclaimViewport: toggleViewport,
     blockSessionSpies: toggleSessionSpies,
     auditLogging: toggleAudit,
+    antiTamperDlp: toggleAntiTamper,
     restoreScroll: toggleScroll,
     stopAutoplay: toggleAutoplay,
     blockSurveys: toggleSurveys
@@ -63,6 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     reclaimViewport: true,
     blockSessionSpies: true,
     auditLogging: true,
+    antiTamperDlp: true,
     whitelistedDomains: [],
     customSelectors: []
   };
