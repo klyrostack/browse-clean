@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS = {
   reclaimViewport: true,
   blockSessionSpies: true,
   auditLogging: true,
+  antiTamperDlp: true,
   whitelistedDomains: [],
   customSelectors: []
 };
