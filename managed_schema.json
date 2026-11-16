@@ -77,6 +77,11 @@
       "description": "Enforce client-side Data Loss Prevention on sensitive inputs and isolate core DOM APIs against prototype tampering.",
       "type": "boolean"
     },
+    "blockWebRtcLeak": {
+      "title": "Block WebRTC IP Leaks",
+      "description": "Enforce Zero-Trust defense by neutralizing WebRTC STUN/ICE private IP discovery and VPN deanonymization.",
+      "type": "boolean"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
