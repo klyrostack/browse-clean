@@ -42,6 +42,7 @@
     blockSessionSpies: true,
     auditLogging: true,
     antiTamperDlp: true,
+    blockWebRtcLeak: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -1184,6 +1185,141 @@
   }
 
   /**
+   * 15. WebRTC & Internal IP Leak Shield (Zero-Trust Network Defense)
+   * Neutralizes STUN/ICE host candidate discovery to prevent local LAN IP disclosure (10.x, 192.168.x, 172.16-31.x)
+   * and VPN bypass deanonymization.
+   */
+  const CONFERENCING_DOMAINS = [
+    'meet.google.com',
+    'zoom.us',
+    'teams.microsoft.com',
+    'webex.com',
+    'discord.com',
+    'slack.com',
+    'chime.aws'
+  ];
+
+  let webrtcShieldInjected = false;
+  function injectWebRtcShield() {
+    if (webrtcShieldInjected || !config.blockWebRtcLeak) return;
+    const isWhitelisted = (config.whitelistedDomains && config.whitelistedDomains.includes(currentHostname)) ||
+                          CONFERENCING_DOMAINS.some(d => currentHostname === d || currentHostname.endsWith('.' + d));
+    if (isWhitelisted) return;
+
+    webrtcShieldInjected = true;
+    try {
+      const script = document.createElement('script');
+      script.id = 'bc-webrtc-shield';
+      script.textContent = `
+        (function() {
+          if (window.__bc_webrtc_shield_active) return;
+          window.__bc_webrtc_shield_active = true;
+
+          const OrigPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+          if (!OrigPeerConnection) return;
+
+          const PRIVATE_IP_REGEX = /^(10\\.|192\\.168\\.|172\\.(1[6-9]|2\\d|3[01])\\.|169\\.254\\.|fe80:|fc00:|fd00:)/i;
+
+          function isPrivateOrSuspicious(candidateStr) {
+            if (!candidateStr || typeof candidateStr !== 'string') return false;
+            const parts = candidateStr.split(' ');
+            if (parts.length >= 5) {
+              const ip = parts[4];
+              if (PRIVATE_IP_REGEX.test(ip)) return true;
+              if (parts[7] === 'typ' && (parts[8] === 'host' || parts[8] === 'srflx')) {
+                if (PRIVATE_IP_REGEX.test(ip)) return true;
+              }
+            }
+            return false;
+          }
+
+          function dispatchIntervention(detail) {
+            try {
+              window.dispatchEvent(new CustomEvent('__bc_webrtc_intervention', { detail: detail }));
+            } catch (e) {}
+          }
+
+          function ProxiedPeerConnection(configuration, constraints) {
+            let safeConfig = configuration;
+            if (safeConfig && Array.isArray(safeConfig.iceServers)) {
+              safeConfig = Object.assign({}, configuration, {
+                iceServers: []
+              });
+              dispatchIntervention('Suppressed untrusted STUN servers');
+            }
+
+            const pc = new OrigPeerConnection(safeConfig, constraints);
+
+            let userCandidateHandler = null;
+            Object.defineProperty(pc, 'onicecandidate', {
+              get: function() {
+                return userCandidateHandler;
+              },
+              set: function(fn) {
+                if (typeof fn !== 'function') {
+                  userCandidateHandler = null;
+                  return;
+                }
+                userCandidateHandler = function(event) {
+                  if (event && event.candidate && event.candidate.candidate) {
+                    if (isPrivateOrSuspicious(event.candidate.candidate)) {
+                      dispatchIntervention('Neutralized private LAN ICE candidate: ' + event.candidate.candidate.slice(0, 35));
+                      return fn.call(this, new RTCPeerConnectionIceEvent('icecandidate', { candidate: null }));
+                    }
+                  }
+                  return fn.apply(this, arguments);
+                };
+              },
+              configurable: true,
+              enumerable: true
+            });
+
+            const origAddEventListener = pc.addEventListener;
+            pc.addEventListener = function(type, listener, options) {
+              if (type === 'icecandidate' && typeof listener === 'function') {
+                const wrappedListener = function(event) {
+                  if (event && event.candidate && event.candidate.candidate) {
+                    if (isPrivateOrSuspicious(event.candidate.candidate)) {
+                      dispatchIntervention('Neutralized private LAN ICE candidate in event listener');
+                      return;
+                    }
+                  }
+                  return listener.apply(this, arguments);
+                };
+                return origAddEventListener.call(this, type, wrappedListener, options);
+              }
+              return origAddEventListener.apply(this, arguments);
+            };
+
+            return pc;
+          }
+
+          ProxiedPeerConnection.prototype = OrigPeerConnection.prototype;
+          if (OrigPeerConnection.generateCertificate) {
+            ProxiedPeerConnection.generateCertificate = OrigPeerConnection.generateCertificate.bind(OrigPeerConnection);
+          }
+
+          try {
+            window.RTCPeerConnection = ProxiedPeerConnection;
+            if (window.webkitRTCPeerConnection) {
+              window.webkitRTCPeerConnection = ProxiedPeerConnection;
+            }
+          } catch(e) {}
+        })();
+      `;
+      (document.head || document.documentElement).appendChild(script);
+      script.remove();
+    } catch (e) {}
+  }
+
+  // Intercept WebRTC IP leak neutralization events dispatched by page shield
+  window.addEventListener('__bc_webrtc_intervention', (e) => {
+    blockedCount++;
+    syncStats();
+    logIntervention('webrtc-shield', 'leak_blocked', e.detail || 'Neutralized private LAN/STUN ICE candidate');
+  });
+
+  /**
    * Main Pipeline execution
    */
   function executeSweep() {
@@ -1197,6 +1333,7 @@
     sweepLoginWalls();
     sweepSessionSpies();
     enforceFormDLP();
+    injectWebRtcShield();
     sweepCustomSelectors();
     breakScrollLock();
     enforceAutoplayPolicy();
@@ -1248,6 +1385,7 @@
 
     injectDLPPageStubs();
     injectAntiTamperShield();
+    injectWebRtcShield();
     executeSweep();
 
     const root = document.documentElement || document;
