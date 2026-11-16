@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   blockSessionSpies: true,
   auditLogging: true,
   antiTamperDlp: true,
+  blockWebRtcLeak: true,
   whitelistedDomains: [],
   customSelectors: []
 };
