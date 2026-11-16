@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const optSessionSpies = document.getElementById('opt-sessionspies');
   const optAudit = document.getElementById('opt-audit');
   const optAntiTamper = document.getElementById('opt-antitamper');
+  const optWebRtc = document.getElementById('opt-webrtc');
   const optScroll = document.getElementById('opt-scroll');
   const optAutoplay = document.getElementById('opt-autoplay');
   const optSurveys = document.getElementById('opt-surveys');
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     blockSessionSpies: optSessionSpies,
     auditLogging: optAudit,
     antiTamperDlp: optAntiTamper,
+    blockWebRtcLeak: optWebRtc,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
     blockSurveys: optSurveys
@@ -93,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
     blockSessionSpies: true,
     auditLogging: true,
     antiTamperDlp: true,
+    blockWebRtcLeak: true,
     whitelistedDomains: [],
     customSelectors: []
   };
