@@ -29,6 +29,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Session Replay & DOM Spy Neutralizer (DLP)**: Stubs and neutralizes Hotjar, FullStory, LogRocket, Clarity, and keystroke surveillance recorders to stop unauthorized corporate data harvesting.
 * **Anti-Tamper & Form DLP Shield**: Shields sensitive credential and payment input fields from unauthorized script harvesting, and isolates DOM prototypes against malicious poisoning.
 * **WebRTC & Internal IP Leak Shield**: Intercepts STUN/ICE host candidate discovery to prevent local LAN IP leaks and corporate VPN bypass deanonymization.
+* **Homoglyph & Punycode Phishing Detector**: Detects deceptive IDN Punycode domains, mixed-script homoglyphs, and lookalike brand impersonation, rendering an active security warning barrier.
 * **Cryptographic Audit Logging & Compliance Export**: Maintains an on-device, tamper-evident activity ledger with SHA-256 integrity verification, exportable as JSON/CSV compliance packages.
 * **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
 * **Scroll Traps**: Clears inline `overflow: hidden`, `position: fixed`, and modal lock classes (`sp-message-open`, `modal-open`, `overflow-hidden`).
@@ -103,7 +104,7 @@ BrowseClean natively integrates with `chrome.storage.managed` via [`managed_sche
 
 * `whitelistedDomains`: Array of mandatory corporate intranet domains (e.g. `["corp.internal", "jira.company.com"]`) that are permanently exempt from filtering.
 * `forcedLockedSettings`: Array of configuration keys that end-users are strictly prohibited from toggling.
-* Any standard module key (`blockCookies`, `cleanUrls`, `unlockCopy`, `blockAntiAdblock`, `reclaimViewport`, `blockSessionSpies`, `auditLogging`, `antiTamperDlp`, `blockWebRtcLeak`) enforced by enterprise policy overrides local user preferences.
+* Any standard module key (`blockCookies`, `cleanUrls`, `unlockCopy`, `blockAntiAdblock`, `reclaimViewport`, `blockSessionSpies`, `auditLogging`, `antiTamperDlp`, `blockWebRtcLeak`, `blockPhishingSpoofs`) enforced by enterprise policy overrides local user preferences.
 
 ### Deployment Channels
 
