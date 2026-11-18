@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS = {
   auditLogging: true,
   antiTamperDlp: true,
   blockWebRtcLeak: true,
+  blockPhishingSpoofs: true,
   whitelistedDomains: [],
   customSelectors: []
 };
