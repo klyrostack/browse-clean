@@ -82,6 +82,11 @@
       "description": "Enforce Zero-Trust defense by neutralizing WebRTC STUN/ICE private IP discovery and VPN deanonymization.",
       "type": "boolean"
     },
+    "blockPhishingSpoofs": {
+      "title": "Block Phishing & Homoglyph Spoofs",
+      "description": "Enforce anti-spoofing defense by detecting Punycode IDNs, mixed-script homoglyphs, and lookalike brand impersonation.",
+      "type": "boolean"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
