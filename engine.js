@@ -43,6 +43,7 @@
     auditLogging: true,
     antiTamperDlp: true,
     blockWebRtcLeak: true,
+    blockPhishingSpoofs: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -1320,10 +1321,143 @@
   });
 
   /**
+   * 16. Homoglyph & Punycode Phishing Detector (Anti-Spoofing Barrier)
+   * Detects deceptive IDN Punycode domains (xn--), mixed-script homoglyphs,
+   * and brand typosquatting targeting enterprise credentials.
+   */
+  const PROTECTED_BRANDS = [
+    'google', 'microsoft', 'apple', 'amazon', 'paypal', 'github', 'gitlab',
+    'facebook', 'netflix', 'twitter', 'linkedin', 'dropbox', 'adobe',
+    'instagram', 'whatsapp', 'chase', 'wellsfargo', 'bankofamerica',
+    'citibank', 'okta', 'salesforce', 'slack', 'coinbase', 'binance'
+  ];
+
+  const HOMOGLYPH_MAP = {
+    '\u0430': 'a', '\u0435': 'e', '\u043E': 'o', '\u0440': 'p', '\u0441': 'c',
+    '\u0443': 'y', '\u0445': 'x', '\u0456': 'i', '\u0458': 'j', '\u0455': 's',
+    '\u0501': 'd', '\u051B': 'q', '\u03BF': 'o', '\u03B1': 'a', '\u03C1': 'p',
+    '\u03BD': 'v', '\u03C9': 'w', '0': 'o', '1': 'l'
+  };
+
+  function normalizeHomoglyphs(str) {
+    let result = '';
+    for (const char of str.toLowerCase()) {
+      result += HOMOGLYPH_MAP[char] || char;
+    }
+    return result;
+  }
+
+  function detectPhishingSpoof(hostname) {
+    if (!hostname || typeof hostname !== 'string') return null;
+    const parts = hostname.toLowerCase().split('.');
+    if (parts.length < 2) return null;
+
+    const label = parts[parts.length - 2];
+
+    // 1. Punycode internationalized domain names (IDN)
+    if (hostname.includes('xn--')) {
+      return {
+        type: 'punycode_idn',
+        reason: 'Punycode Internationalized Domain Name (IDN) detected'
+      };
+    }
+
+    // 2. Mixed-script homoglyphs (mixing Latin with Cyrillic or Greek)
+    const hasLatin = /[a-z]/.test(label);
+    const hasCyrillicOrGreek = /[\u0400-\u04FF\u0370-\u03FF]/.test(label);
+    if (hasLatin && hasCyrillicOrGreek) {
+      return {
+        type: 'mixed_script_homoglyph',
+        reason: 'Deceptive mixed Latin and Cyrillic/Greek characters detected'
+      };
+    }
+
+    // 3. Protected brand impersonation via homoglyphs or typosquatting
+    const normalized = normalizeHomoglyphs(label);
+    const matchedBrand = PROTECTED_BRANDS.find(b => normalized === b || normalized.includes(b));
+    if (matchedBrand) {
+      const isLegitDomain = hostname === `${matchedBrand}.com` || hostname.endsWith(`.${matchedBrand}.com`);
+      if (!isLegitDomain && (label !== matchedBrand || hasCyrillicOrGreek || normalized !== label)) {
+        return {
+          type: 'brand_impersonation',
+          reason: `Deceptive lookalike domain impersonating ${matchedBrand.toUpperCase()}`,
+          target: matchedBrand
+        };
+      }
+    }
+
+    return null;
+  }
+
+  let phishingBarrierActive = false;
+  function renderSecurityBarrier(spoofInfo) {
+    if (phishingBarrierActive || !config.blockPhishingSpoofs) return;
+    if (document.getElementById('browseclean-phishing-barrier')) return;
+    phishingBarrierActive = true;
+
+    try {
+      const barrier = document.createElement('div');
+      barrier.id = 'browseclean-phishing-barrier';
+      barrier.innerHTML = `
+        <div class="bc-barrier-card">
+          <div class="bc-barrier-tag">Security Alert: Deceptive Domain</div>
+          <h1 class="bc-barrier-title">Potential Phishing or Spoofing Attack Blocked</h1>
+          <p class="bc-barrier-desc">
+            BrowseClean Zero-Trust engine detected that this site uses deceptive Punycode, mixed-script homoglyphs, or character substitutions mimicking a legitimate enterprise brand.
+          </p>
+          <div class="bc-barrier-meta">
+            <div><strong>Host:</strong> ${currentHostname}</div>
+            <div><strong>Vector:</strong> ${spoofInfo.reason}</div>
+            <div><strong>Type:</strong> ${spoofInfo.type}</div>
+          </div>
+          <div class="bc-barrier-actions">
+            <button class="bc-barrier-btn-primary" id="bc-barrier-leave-btn">Leave Site (Recommended)</button>
+            <button class="bc-barrier-btn-secondary" id="bc-barrier-bypass-btn">Bypass Barrier</button>
+          </div>
+        </div>
+      `;
+
+      (document.body || document.documentElement).appendChild(barrier);
+
+      const leaveBtn = document.getElementById('bc-barrier-leave-btn');
+      if (leaveBtn) {
+        leaveBtn.addEventListener('click', () => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.href = 'about:blank';
+          }
+        });
+      }
+
+      const bypassBtn = document.getElementById('bc-barrier-bypass-btn');
+      if (bypassBtn) {
+        bypassBtn.addEventListener('click', () => {
+          barrier.remove();
+          phishingBarrierActive = false;
+        });
+      }
+
+      blockedCount++;
+      syncStats();
+      logIntervention('security', 'phishing_spoof_blocked', `${spoofInfo.type}: ${currentHostname}`);
+    } catch (e) {}
+  }
+
+  function enforcePhishingDefense() {
+    if (!config.blockPhishingSpoofs) return;
+    const spoof = detectPhishingSpoof(currentHostname);
+    if (spoof) {
+      renderSecurityBarrier(spoof);
+    }
+  }
+
+  /**
    * Main Pipeline execution
    */
   function executeSweep() {
     if (!isCleanActive) return;
+    enforcePhishingDefense();
     sweepCookieWalls();
     sweepChatWidgets();
     sweepSurveys();
@@ -1386,6 +1520,7 @@
     injectDLPPageStubs();
     injectAntiTamperShield();
     injectWebRtcShield();
+    enforcePhishingDefense();
     executeSweep();
 
     const root = document.documentElement || document;
