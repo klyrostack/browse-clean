@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleAudit = document.getElementById('toggleAudit');
   const toggleAntiTamper = document.getElementById('toggleAntiTamper');
   const toggleWebRtc = document.getElementById('toggleWebRtc');
+  const togglePhishing = document.getElementById('togglePhishing');
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
@@ -44,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     auditLogging: toggleAudit,
     antiTamperDlp: toggleAntiTamper,
     blockWebRtcLeak: toggleWebRtc,
+    blockPhishingSpoofs: togglePhishing,
     restoreScroll: toggleScroll,
     stopAutoplay: toggleAutoplay,
     blockSurveys: toggleSurveys
@@ -69,6 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     auditLogging: true,
     antiTamperDlp: true,
     blockWebRtcLeak: true,
+    blockPhishingSpoofs: true,
     whitelistedDomains: [],
     customSelectors: []
   };
