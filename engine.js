@@ -44,6 +44,7 @@
     antiTamperDlp: true,
     blockWebRtcLeak: true,
     blockPhishingSpoofs: true,
+    clipboardDlp: true,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -743,7 +744,93 @@
   }
 
   /**
-   * 8. Custom User Selectors
+   * 8. Bidirectional Clipboard DLP & Zero-Width Watermark Sanitizer
+   * Inbound: Scrubs invisible zero-width characters (steganographic tracking watermarks)
+   * Outbound: Detects sensitive API keys / credentials and prevents unauthorized background paste siphoning
+   */
+  const ZERO_WIDTH_REGEX = /[\u200B\u200C\u200D\uFEFF\u2060\u180E\u200E\u200F\u202A-\u202E]/g;
+
+  const SENSITIVE_TOKEN_PATTERNS = [
+    /\bAKIA[0-9A-Z]{16}\b/,
+    /\bgh[pousr]_[A-Za-z0-9_]{36,}\b/,
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+    /\bsk-[a-zA-Z0-9_-]{32,}\b/,
+    /\bBearer\s+[a-zA-Z0-9_\-\.]{40,}\b/
+  ];
+
+  let clipboardDlpAttached = false;
+  function attachClipboardDlp() {
+    if (clipboardDlpAttached) return;
+    clipboardDlpAttached = true;
+
+    // 1. Intercept copy and cut events in capturing phase
+    const handleCopyCut = (e) => {
+      if (!config.clipboardDlp) return;
+      const selection = window.getSelection();
+      let text = selection ? selection.toString() : '';
+
+      const activeEl = document.activeElement;
+      if (!text && activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        const start = activeEl.selectionStart;
+        const end = activeEl.selectionEnd;
+        if (typeof start === 'number' && typeof end === 'number' && start !== end) {
+          text = activeEl.value.substring(start, end);
+        }
+      }
+
+      if (!text) return;
+
+      let sanitizedText = text;
+      let modified = false;
+
+      // Inbound: Strip zero-width tracking watermarks
+      if (ZERO_WIDTH_REGEX.test(text)) {
+        sanitizedText = text.replace(ZERO_WIDTH_REGEX, '');
+        modified = true;
+        blockedCount++;
+        syncStats();
+        logIntervention('clipboard-dlp', 'watermark_stripped', 'Sanitized zero-width tracking watermarks from copied text');
+      }
+
+      // Outbound: Detect high-risk corporate API tokens on non-whitelisted sites
+      const hasSecret = SENSITIVE_TOKEN_PATTERNS.some(pat => pat.test(text));
+      if (hasSecret) {
+        logIntervention('clipboard-dlp', 'credential_copy_audited', 'Sensitive API token or private key detected in clipboard payload');
+      }
+
+      if (modified && e.clipboardData) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        e.clipboardData.setData('text/plain', sanitizedText);
+      }
+    };
+
+    document.addEventListener('copy', handleCopyCut, true);
+    document.addEventListener('cut', handleCopyCut, true);
+
+    // 2. Prevent unauthorized background paste siphoning
+    document.addEventListener('paste', (e) => {
+      if (!config.clipboardDlp) return;
+      const target = e.target;
+      const isInput = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        (target.getAttribute && target.getAttribute('contenteditable') === 'true')
+      );
+
+      if (!isInput && e.isTrusted === false) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        blockedCount++;
+        syncStats();
+        logIntervention('clipboard-dlp', 'paste_siphoning_blocked', 'Blocked synthetic paste event on non-editable element');
+      }
+    }, true);
+  }
+
+  /**
+   * 9. Custom User Selectors
    */
   function sweepCustomSelectors() {
     if (!config.customSelectors || !config.customSelectors.length) return;
@@ -1473,6 +1560,7 @@
     enforceAutoplayPolicy();
     enableSelectionAndCopy();
     attachUrlCleaner();
+    attachClipboardDlp();
     attachViewportReclaimListener();
     reclaimViewportRealEstate();
   }
