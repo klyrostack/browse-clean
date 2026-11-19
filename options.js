@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const optAntiTamper = document.getElementById('opt-antitamper');
   const optWebRtc = document.getElementById('opt-webrtc');
   const optPhishing = document.getElementById('opt-phishing');
+  const optClipboardDlp = document.getElementById('opt-clipboard-dlp');
   const optScroll = document.getElementById('opt-scroll');
   const optAutoplay = document.getElementById('opt-autoplay');
   const optSurveys = document.getElementById('opt-surveys');
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     antiTamperDlp: optAntiTamper,
     blockWebRtcLeak: optWebRtc,
     blockPhishingSpoofs: optPhishing,
+    clipboardDlp: optClipboardDlp,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
     blockSurveys: optSurveys
@@ -99,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     antiTamperDlp: true,
     blockWebRtcLeak: true,
     blockPhishingSpoofs: true,
+    clipboardDlp: true,
     whitelistedDomains: [],
     customSelectors: []
   };
