@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
   antiTamperDlp: true,
   blockWebRtcLeak: true,
   blockPhishingSpoofs: true,
+  clipboardDlp: true,
   whitelistedDomains: [],
   customSelectors: []
 };
