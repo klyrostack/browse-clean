@@ -87,6 +87,11 @@
       "description": "Enforce anti-spoofing defense by detecting Punycode IDNs, mixed-script homoglyphs, and lookalike brand impersonation.",
       "type": "boolean"
     },
+    "clipboardDlp": {
+      "title": "Clipboard DLP & Watermark Sanitizer",
+      "description": "Enforce bidirectional clipboard sanitization by stripping invisible zero-width tracking watermarks and shielding API keys and credentials.",
+      "type": "boolean"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
