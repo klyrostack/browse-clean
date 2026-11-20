@@ -44,6 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportComplianceCsvBtn = document.getElementById('exportComplianceCsvBtn');
   const clearAuditLogBtn = document.getElementById('clearAuditLogBtn');
 
+  const enterprisePolicyStatusVal = document.getElementById('enterprisePolicyStatusVal');
+  const enterpriseEnforcedKeysVal = document.getElementById('enterpriseEnforcedKeysVal');
+  const enterprisePolicyHashVal = document.getElementById('enterprisePolicyHashVal');
+  const downloadGpoRegBtn = document.getElementById('downloadGpoRegBtn');
+  const downloadGoogleAdminJsonBtn = document.getElementById('downloadGoogleAdminJsonBtn');
+
   let lockedKeys = [];
   let isManaged = false;
 
@@ -390,6 +396,82 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function loadEnterpriseDiagnostics() {
+    chrome.runtime.sendMessage({ action: 'getEnterpriseDiagnostics' }, (res) => {
+      if (!res) return;
+      if (enterprisePolicyStatusVal) {
+        enterprisePolicyStatusVal.textContent = res.isManaged ? 'Active (Managed via GPO / Admin)' : 'Local Standalone (GPO Ready)';
+        enterprisePolicyStatusVal.style.color = res.isManaged ? '#60A5FA' : '#E4E4E7';
+      }
+      if (enterpriseEnforcedKeysVal) {
+        enterpriseEnforcedKeysVal.textContent = `${res.lockedKeys.length} / ${res.totalSchemaKeys} Keys Enforced`;
+      }
+      if (enterprisePolicyHashVal) {
+        enterprisePolicyHashVal.textContent = res.policyHash ? res.policyHash.slice(0, 24) + '...' : 'Unavailable';
+      }
+    });
+  }
+
+  if (downloadGpoRegBtn) {
+    downloadGpoRegBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'getEnterpriseDiagnostics' }, (res) => {
+        const extId = (res && res.extensionId) ? res.extensionId : 'EXTENSION_ID_HERE';
+        const schemaKeys = (res && res.schemaKeys) ? res.schemaKeys : [
+          'blockCookies', 'blockNewsletters', 'blockChats', 'restoreScroll',
+          'stopAutoplay', 'blockNotifications', 'blockSurveys', 'unblurContent',
+          'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
+          'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
+          'blockWebRtcLeak', 'blockPhishingSpoofs', 'clipboardDlp'
+        ];
+
+        let regContent = 'Windows Registry Editor Version 5.00\r\n\r\n';
+        regContent += `; BrowseClean Enterprise Policy Template\r\n`;
+        regContent += `; Extension ID: ${extId}\r\n\r\n`;
+        regContent += `[HKEY_LOCAL_MACHINE\\Software\\Policies\\Google\\Chrome\\3rdparty\\extensions\\${extId}\\policy]\r\n`;
+
+        schemaKeys.forEach(key => {
+          regContent += `"${key}"=dword:00000001\r\n`;
+        });
+
+        const blob = new Blob([regContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `browseclean-enterprise-policy-${extId}.reg`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    });
+  }
+
+  if (downloadGoogleAdminJsonBtn) {
+    downloadGoogleAdminJsonBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'getEnterpriseDiagnostics' }, (res) => {
+        const schemaKeys = (res && res.schemaKeys) ? res.schemaKeys : [];
+        const policyPayload = {};
+        schemaKeys.forEach(k => {
+          policyPayload[k] = true;
+        });
+        policyPayload.whitelistedDomains = ['internal.corp', 'jira.company.com'];
+        policyPayload.forcedLockedSettings = schemaKeys.slice(0, 10);
+
+        const jsonStr = JSON.stringify(policyPayload, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'browseclean-google-admin-policy.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    });
+  }
+
   loadSettings();
   loadAuditMetrics();
+  loadEnterpriseDiagnostics();
 });
