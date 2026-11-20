@@ -357,6 +357,44 @@
             <button id="clearAuditLogBtn" class="btn btn-danger">Clear Audit Log</button>
           </div>
         </div>
+
+        <div class="pane-header" style="margin-top: 36px;">
+          <h1>Chromium Enterprise Policy & Fleet Management</h1>
+          <p class="subtitle">Administrative deployment inspection, GPO registry integration, and central schema governance via chrome.storage.managed.</p>
+        </div>
+
+        <div class="card">
+          <div class="audit-status-grid">
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="enterprisePolicyStatusVal">Local Standalone</span>
+              <span class="audit-stat-lbl">Fleet Enforcement Status</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="enterpriseEnforcedKeysVal">0 Policies</span>
+              <span class="audit-stat-lbl">Active Enforced Keys</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val mono" id="enterprisePolicyHashVal">Computing...</span>
+              <span class="audit-stat-lbl">Policy Fingerprint (SHA-256)</span>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Download Windows Registry GPO Template (.reg)</span>
+              <p class="action-desc">Generates an automated Windows Registry script targeting HKEY_LOCAL_MACHINE with all 19 enterprise security policies enabled for this extension ID.</p>
+            </div>
+            <button id="downloadGpoRegBtn" class="btn btn-secondary">Download .reg Script</button>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Download Google Admin & Jamf Policy (JSON)</span>
+              <p class="action-desc">Download a standardized configuration payload formatted for direct upload into Google Admin Console or macOS Jamf MDM profiles.</p>
+            </div>
+            <button id="downloadGoogleAdminJsonBtn" class="btn btn-secondary">Download Policy JSON</button>
+          </div>
+        </div>
       </section>
     </main>
   </div>
