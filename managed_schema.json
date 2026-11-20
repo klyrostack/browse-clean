@@ -27,6 +27,11 @@
       "description": "Enforce pausing unprompted background HTML5 video playback.",
       "type": "boolean"
     },
+    "blockNotifications": {
+      "title": "Block Notification Prompts",
+      "description": "Enforce suppression of intrusive web push notification permission dialogs.",
+      "type": "boolean"
+    },
     "blockSurveys": {
       "title": "Block Surveys",
       "description": "Enforce suppression of intrusive feedback and survey dialogs.",
