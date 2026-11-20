@@ -105,16 +105,17 @@ BrowseClean natively integrates with `chrome.storage.managed` via [`managed_sche
 
 * `whitelistedDomains`: Array of mandatory corporate intranet domains (e.g. `["corp.internal", "jira.company.com"]`) that are permanently exempt from filtering.
 * `forcedLockedSettings`: Array of configuration keys that end-users are strictly prohibited from toggling.
-* Any standard module key (`blockCookies`, `cleanUrls`, `unlockCopy`, `blockAntiAdblock`, `reclaimViewport`, `blockSessionSpies`, `auditLogging`, `antiTamperDlp`, `blockWebRtcLeak`, `blockPhishingSpoofs`, `clipboardDlp`) enforced by enterprise policy overrides local user preferences.
+* Any standard module key (`blockCookies`, `blockNewsletters`, `blockChats`, `restoreScroll`, `stopAutoplay`, `blockNotifications`, `blockSurveys`, `unblurContent`, `unlockCopy`, `cleanUrls`, `blockAntiAdblock`, `blockLoginWalls`, `reclaimViewport`, `blockSessionSpies`, `auditLogging`, `antiTamperDlp`, `blockWebRtcLeak`, `blockPhishingSpoofs`, `clipboardDlp`) enforced by enterprise policy overrides local user preferences.
 
 ### Deployment Channels
 
 * **Windows GPO / Active Directory Registry:**
   `HKEY_LOCAL_MACHINE\Software\Policies\Google\Chrome\3rdparty\extensions\<extension-id>\policy`
+  (Administrative `.reg` template exportable directly from Options > Fleet Management).
 * **macOS Configuration Profiles (Jamf / MDM):**
   Managed preferences payload targeting `com.google.Chrome.extensions.<extension-id>`.
-* **Google Admin Console:**
-  Upload `managed_schema.json` directly under **Devices > Chrome > Apps & extensions > Users & browsers**.
+* **Google Admin Console (Chrome Enterprise Core):**
+  Upload `managed_schema.json` directly under **Devices > Chrome > Apps & extensions > Users & browsers** (Policy JSON payload exportable from Options > Fleet Management).
 
 ---
 
