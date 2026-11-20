@@ -229,4 +229,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  if (message.action === 'getEnterpriseDiagnostics') {
+    resolveEffectiveSettings(async (settings, lockedKeys, isManaged, managedSettings) => {
+      const extensionId = chrome.runtime.id;
+      const schemaKeys = [
+        'blockCookies', 'blockNewsletters', 'blockChats', 'restoreScroll',
+        'stopAutoplay', 'blockNotifications', 'blockSurveys', 'unblurContent',
+        'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
+        'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
+        'blockWebRtcLeak', 'blockPhishingSpoofs', 'clipboardDlp'
+      ];
+      const payloadToHash = JSON.stringify({ settings, lockedKeys, isManaged });
+      const policyHash = await computeSha256(payloadToHash);
+
+      sendResponse({
+        isManaged: isManaged,
+        managedSettings: managedSettings || {},
+        lockedKeys: lockedKeys || [],
+        policyHash: policyHash,
+        totalSchemaKeys: schemaKeys.length,
+        schemaKeys: schemaKeys,
+        extensionId: extensionId,
+        settings: settings
+      });
+    });
+    return true;
+  }
 });
