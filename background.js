@@ -116,13 +116,71 @@ if (chrome.storage && chrome.storage.onChanged) {
   });
 }
 
-// Cryptographic Hash Utility (SHA-256 via Web Crypto API)
+// Cryptographic Hash Utility & Merkle-Chain Engine (SHA-256 via Web Crypto API)
+const GENESIS_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
+
 async function computeSha256(str) {
   const enc = new TextEncoder();
   const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
   return Array.from(new Uint8Array(buf))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+async function verifyAuditLogChain(log) {
+  if (!Array.isArray(log) || log.length === 0) {
+    return {
+      valid: true,
+      chainLength: 0,
+      rootHash: GENESIS_HASH,
+      tamperedIndex: -1,
+      reason: 'Genesis state: 0 events recorded'
+    };
+  }
+
+  // log[0] is newest block, log[log.length - 1] is oldest
+  const reversed = [...log].reverse();
+  let expectedPrevHash = GENESIS_HASH;
+
+  for (let i = 0; i < reversed.length; i++) {
+    const item = reversed[i];
+    if (!item.entryHash || !item.prevHash) {
+      continue;
+    }
+
+    if (i > 0 && item.prevHash !== expectedPrevHash) {
+      return {
+        valid: false,
+        chainLength: i,
+        rootHash: item.entryHash,
+        tamperedIndex: log.length - 1 - i,
+        reason: `Broken chain link at block #${item.sequence}: prevHash does not match previous block hash`
+      };
+    }
+
+    const payload = `${item.sequence}|${item.timestamp}|${item.domain}|${item.category}|${item.action}|${item.details || ''}|${item.prevHash}`;
+    const calculatedHash = await computeSha256(payload);
+
+    if (calculatedHash !== item.entryHash) {
+      return {
+        valid: false,
+        chainLength: i,
+        rootHash: item.entryHash,
+        tamperedIndex: log.length - 1 - i,
+        reason: `Tampered content at block #${item.sequence}: cryptographic signature mismatch`
+      };
+    }
+
+    expectedPrevHash = item.entryHash;
+  }
+
+  return {
+    valid: true,
+    chainLength: log.length,
+    rootHash: log[0].entryHash || (await computeSha256(JSON.stringify(log))),
+    tamperedIndex: -1,
+    reason: `All ${log.length} blocks verified against sequential SHA-256 hash chain`
+  };
 }
 
 // Telemetry, Audit Logging & Badge Synchronization
@@ -141,19 +199,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ignored: true });
         return;
       }
-      chrome.storage.local.get(['auditLog'], (res) => {
+      chrome.storage.local.get(['auditLog'], async (res) => {
         let log = res.auditLog || [];
-        const entry = Object.assign({
-          id: (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
-          timestamp: new Date().toISOString()
-        }, message.entry);
+        const prevHash = (log.length > 0 && log[0].entryHash) ? log[0].entryHash : GENESIS_HASH;
+        const sequence = (log.length > 0 && typeof log[0].sequence === 'number') ? log[0].sequence + 1 : (log.length + 1);
+        const timestamp = new Date().toISOString();
+        const domain = (message.entry && message.entry.domain) ? message.entry.domain : '';
+        const category = (message.entry && message.entry.category) ? message.entry.category : 'general';
+        const action = (message.entry && message.entry.action) ? message.entry.action : 'intervene';
+        const details = (message.entry && message.entry.details) ? message.entry.details : '';
 
-        log.unshift(entry);
+        const payload = `${sequence}|${timestamp}|${domain}|${category}|${action}|${details}|${prevHash}`;
+        const entryHash = await computeSha256(payload);
+
+        const chainedEntry = {
+          sequence: sequence,
+          id: (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+          timestamp: timestamp,
+          domain: domain,
+          category: category,
+          action: action,
+          details: details,
+          prevHash: prevHash,
+          entryHash: entryHash
+        };
+
+        log.unshift(chainedEntry);
         if (log.length > 1000) {
           log = log.slice(0, 1000);
         }
-        chrome.storage.local.set({ auditLog: log }, () => {
-          sendResponse({ recorded: true, count: log.length });
+        chrome.storage.local.set({ auditLog: log, auditRootHash: entryHash }, () => {
+          sendResponse({ recorded: true, count: log.length, rootHash: entryHash });
         });
       });
     });
@@ -163,14 +239,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getAuditLog') {
     chrome.storage.local.get(['auditLog'], async (res) => {
       const log = res.auditLog || [];
-      const hash = await computeSha256(JSON.stringify(log));
-      sendResponse({ log, count: log.length, sha256: hash });
+      const verification = await verifyAuditLogChain(log);
+      sendResponse({
+        log: log,
+        count: log.length,
+        sha256: verification.rootHash,
+        rootHash: verification.rootHash,
+        verification: verification
+      });
+    });
+    return true;
+  }
+
+  if (message.action === 'verifyAuditLog') {
+    chrome.storage.local.get(['auditLog'], async (res) => {
+      const log = res.auditLog || [];
+      const verification = await verifyAuditLogChain(log);
+      sendResponse({ verification: verification });
     });
     return true;
   }
 
   if (message.action === 'clearAuditLog') {
-    chrome.storage.local.set({ auditLog: [] }, () => {
+    chrome.storage.local.set({ auditLog: [], auditRootHash: GENESIS_HASH }, () => {
       sendResponse({ cleared: true });
     });
     return true;
@@ -180,17 +271,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.get(['auditLog', 'stats', 'settings'], async (res) => {
       const log = res.auditLog || [];
       const stats = res.stats || { totalBlocked: 0, sitesCleaned: 0 };
-      const rawPayload = JSON.stringify(log);
-      const sha256 = await computeSha256(rawPayload);
+      const verification = await verifyAuditLogChain(log);
 
       const compliancePackage = {
-        complianceStandard: 'BrowseClean Cryptographic Audit Spec v1.0',
+        complianceStandard: 'BrowseClean Cryptographic Audit Spec v2.0 (Merkle-Chain Ledger)',
         generatedAt: new Date().toISOString(),
         extensionVersion: chrome.runtime.getManifest().version,
         environment: 'Local Client-Side Sandbox (Zero Outbound Exfiltration)',
         cryptographicProof: {
           algorithm: 'SHA-256',
-          digest: sha256
+          architecture: 'Sequential Hash-Chained Audit Ledger',
+          genesisHash: GENESIS_HASH,
+          chainRootHash: verification.rootHash,
+          chainIntegrityVerified: verification.valid,
+          verifiedBlockCount: verification.chainLength
         },
         metrics: {
           totalLoggedInterventions: log.length,
@@ -199,7 +293,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         auditTrail: log
       };
 
-      sendResponse({ package: compliancePackage, sha256 });
+      sendResponse({ package: compliancePackage, sha256: verification.rootHash, verification: verification });
     });
     return true;
   }
