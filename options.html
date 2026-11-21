@@ -328,10 +328,23 @@
               <span class="audit-stat-lbl">Interventions Recorded</span>
             </div>
             <div class="audit-stat-box">
+              <span class="audit-stat-val" id="auditChainStatusVal">Verified</span>
+              <span class="audit-stat-lbl">Chain Integrity (SHA-256)</span>
+            </div>
+            <div class="audit-stat-box">
               <span class="audit-stat-val mono" id="auditHashVal">Calculating...</span>
-              <span class="audit-stat-lbl">Journal SHA-256 Signature</span>
+              <span class="audit-stat-lbl">Root Hash Signature</span>
             </div>
           </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Verify Hash-Chain Integrity</span>
+              <p class="action-desc">Performs client-side mathematical recalculation of every sequential block in the audit ledger to verify that zero tampering or record deletion has occurred.</p>
+            </div>
+            <button id="verifyAuditChainBtn" class="btn btn-secondary">Verify Ledger</button>
+          </div>
+          <div id="auditVerificationAlert" class="audit-verify-alert" style="display: none;"></div>
 
           <div class="action-row">
             <div>
