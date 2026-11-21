@@ -31,7 +31,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **WebRTC & Internal IP Leak Shield**: Intercepts STUN/ICE host candidate discovery to prevent local LAN IP leaks and corporate VPN bypass deanonymization.
 * **Homoglyph & Punycode Phishing Detector**: Detects deceptive IDN Punycode domains, mixed-script homoglyphs, and lookalike brand impersonation, rendering an active security warning barrier.
 * **Bidirectional Clipboard DLP & Watermark Sanitizer**: Scrubs invisible zero-width tracking watermarks from copied text and shields high-risk API keys from clipboard siphoning.
-* **Cryptographic Audit Logging & Compliance Export**: Maintains an on-device, tamper-evident activity ledger with SHA-256 integrity verification, exportable as JSON/CSV compliance packages.
+* **Cryptographic Audit Logging (Native Web Crypto API)**: Maintains an on-device, sequential SHA-256 hash-chained ledger powered by `crypto.subtle.digest('SHA-256')`. Each intervention block binds to the preceding block's hash, enabling client-side mathematical verification of zero tampering or record deletion, exportable as signed JSON and CSV compliance packages.
 * **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
 * **Scroll Traps**: Clears inline `overflow: hidden`, `position: fixed`, and modal lock classes (`sp-message-open`, `modal-open`, `overflow-hidden`).
 * **Autoplay Media**: Pauses unprompted background video playback.
@@ -116,6 +116,19 @@ BrowseClean natively integrates with `chrome.storage.managed` via [`managed_sche
   Managed preferences payload targeting `com.google.Chrome.extensions.<extension-id>`.
 * **Google Admin Console (Chrome Enterprise Core):**
   Upload `managed_schema.json` directly under **Devices > Chrome > Apps & extensions > Users & browsers** (Policy JSON payload exportable from Options > Fleet Management).
+
+---
+
+## Cryptographic Audit Ledger (Native Web Crypto API)
+
+BrowseClean maintains a fully client-side, sequential cryptographic hash-chained ledger powered by the browser's native Web Crypto API (`crypto.subtle.digest('SHA-256')`).
+
+### Mathematical Mechanics
+* **Genesis Anchor**: Block sequence `#0` anchors to a fixed 64-character genesis hash (`0000000000000000000000000000000000000000000000000000000000000000`).
+* **Sequential Chaining**: Each logged intervention calculates its entry digest by cryptographically binding the record payload with the preceding block's hash:
+  `EntryHash = SHA256(sequence | timestamp | domain | category | action | details | prevHash)`
+* **Tamper-Evident Verification**: The Options dashboard provides a mathematical integrity auditor that traverses the entire chain from Genesis to root. Any altered field, deleted record, or reordered sequence invalidates subsequent block hashes and flags the exact index of the compromised block.
+* **Compliance Manifest**: Exports a structured SOC 2 / ISO 27001 compliance verification package containing the ledger root hash, sequence proofs, and cryptographic verification status with zero external network dependencies.
 
 ---
 
