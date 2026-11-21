@@ -39,7 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const enterpriseStatus = document.getElementById('enterpriseStatus');
 
   const auditCountVal = document.getElementById('auditCountVal');
+  const auditChainStatusVal = document.getElementById('auditChainStatusVal');
   const auditHashVal = document.getElementById('auditHashVal');
+  const verifyAuditChainBtn = document.getElementById('verifyAuditChainBtn');
+  const auditVerificationAlert = document.getElementById('auditVerificationAlert');
   const exportComplianceJsonBtn = document.getElementById('exportComplianceJsonBtn');
   const exportComplianceCsvBtn = document.getElementById('exportComplianceCsvBtn');
   const clearAuditLogBtn = document.getElementById('clearAuditLogBtn');
@@ -330,15 +333,63 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ action: 'getAuditLog' }, (res) => {
       if (res) {
         if (auditCountVal) auditCountVal.textContent = (res.count || 0).toLocaleString();
+        if (auditChainStatusVal) {
+          if (res.verification && res.verification.valid) {
+            auditChainStatusVal.textContent = 'Verified / Immutable';
+            auditChainStatusVal.style.color = '#34D399';
+          } else if (res.count === 0) {
+            auditChainStatusVal.textContent = 'Genesis Verified (0 Events)';
+            auditChainStatusVal.style.color = '#60A5FA';
+          } else {
+            auditChainStatusVal.textContent = 'Integrity Compromised';
+            auditChainStatusVal.style.color = '#F87171';
+          }
+        }
         if (auditHashVal) {
-          if (res.count > 0 && res.sha256) {
-            auditHashVal.textContent = res.sha256.slice(0, 16) + '...' + res.sha256.slice(-8);
-            auditHashVal.title = res.sha256;
+          const hash = res.rootHash || res.sha256;
+          if (res.count > 0 && hash) {
+            auditHashVal.textContent = hash.slice(0, 16) + '...' + hash.slice(-8);
+            auditHashVal.title = hash;
           } else {
             auditHashVal.textContent = 'Verified Clean (0 Events)';
           }
         }
       }
+    });
+  }
+
+  if (verifyAuditChainBtn) {
+    verifyAuditChainBtn.addEventListener('click', () => {
+      verifyAuditChainBtn.disabled = true;
+      verifyAuditChainBtn.textContent = 'Verifying...';
+      chrome.runtime.sendMessage({ action: 'verifyAuditLog' }, (res) => {
+        verifyAuditChainBtn.disabled = false;
+        verifyAuditChainBtn.textContent = 'Verify Ledger';
+        if (!res || !auditVerificationAlert) return;
+
+        auditVerificationAlert.style.display = 'block';
+        if (res.valid) {
+          auditVerificationAlert.className = 'audit-verify-alert success';
+          auditVerificationAlert.innerHTML = `
+            <strong>Hash-Chain Verification Passed:</strong> All ${res.verifiedCount} sequential blocks mathematically verified from Genesis. Zero record modifications, tampering, or deletions detected.<br>
+            <span style="font-family: monospace; font-size: 11px; opacity: 0.9;">Chain Root Hash: ${res.rootHash}</span>
+          `;
+          if (auditChainStatusVal) {
+            auditChainStatusVal.textContent = 'Verified / Immutable';
+            auditChainStatusVal.style.color = '#34D399';
+          }
+        } else {
+          auditVerificationAlert.className = 'audit-verify-alert danger';
+          auditVerificationAlert.innerHTML = `
+            <strong>Cryptographic Anomaly Detected:</strong> Hash-chain mismatch at sequence block #${res.tamperedIndex}. Reason: ${res.reason || 'Cryptographic digest does not match previous block.'}<br>
+            <span style="font-family: monospace; font-size: 11px; opacity: 0.9;">Expected: ${res.expectedPrevHash || 'N/A'} | Stored: ${res.storedPrevHash || 'N/A'}</span>
+          `;
+          if (auditChainStatusVal) {
+            auditChainStatusVal.textContent = 'Integrity Compromised';
+            auditChainStatusVal.style.color = '#F87171';
+          }
+        }
+      });
     });
   }
 
@@ -361,16 +412,20 @@ document.addEventListener('DOMContentLoaded', () => {
     exportComplianceCsvBtn.addEventListener('click', () => {
       chrome.runtime.sendMessage({ action: 'getAuditLog' }, (res) => {
         const log = (res && res.log) ? res.log : [];
-        const headers = ['Timestamp', 'Domain', 'Category', 'Action', 'Details'];
+        const headers = ['Sequence', 'Timestamp', 'Domain', 'Category', 'Action', 'Details', 'PrevHash', 'EntryHash'];
         const csvRows = [headers.join(',')];
 
-        log.forEach(item => {
+        log.forEach((item, idx) => {
+          const seq = item.sequence !== undefined ? item.sequence : (log.length - idx);
           const row = [
+            `"${seq}"`,
             `"${(item.timestamp || '').replace(/"/g, '""')}"`,
             `"${(item.domain || '').replace(/"/g, '""')}"`,
             `"${(item.category || '').replace(/"/g, '""')}"`,
             `"${(item.action || '').replace(/"/g, '""')}"`,
-            `"${(item.details || '').replace(/"/g, '""')}"`
+            `"${(item.details || '').replace(/"/g, '""')}"`,
+            `"${(item.prevHash || '').replace(/"/g, '""')}"`,
+            `"${(item.entryHash || '').replace(/"/g, '""')}"`
           ];
           csvRows.push(row.join(','));
         });
@@ -378,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join('\n'));
         const a = document.createElement('a');
         a.setAttribute("href", csvContent);
-        a.setAttribute("download", `browseclean-audit-log-${Date.now()}.csv`);
+        a.setAttribute("download", `browseclean-cryptographic-audit-ledger-${Date.now()}.csv`);
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -390,6 +445,9 @@ document.addEventListener('DOMContentLoaded', () => {
     clearAuditLogBtn.addEventListener('click', () => {
       if (confirm('Permanently clear all local cryptographic audit records?')) {
         chrome.runtime.sendMessage({ action: 'clearAuditLog' }, () => {
+          if (auditVerificationAlert) {
+            auditVerificationAlert.style.display = 'none';
+          }
           loadAuditMetrics();
         });
       }
