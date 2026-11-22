@@ -1303,22 +1303,54 @@
           if (window.__bc_webrtc_shield_active) return;
           window.__bc_webrtc_shield_active = true;
 
-          const OrigPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+          const OrigPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
           if (!OrigPeerConnection) return;
 
-          const PRIVATE_IP_REGEX = /^(10\\.|192\\.168\\.|172\\.(1[6-9]|2\\d|3[01])\\.|169\\.254\\.|fe80:|fc00:|fd00:)/i;
+          const PRIVATE_IP_REGEX = /^(10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|192\\.168\\.\\d{1,3}\\.\\d{1,3}|172\\.(1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3}|169\\.254\\.\\d{1,3}\\.\\d{1,3}|127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d{1,3}\\.\\d{1,3}|0\\.0\\.0\\.0|fe80:[0-9a-fA-F:]*|fc00:[0-9a-fA-F:]*|fd00:[0-9a-fA-F:]*|::1|::ffff:(?:10\\.|192\\.168\\.|172\\.(1[6-9]|2\\d|3[01])\\.|127\\.))/i;
 
           function isPrivateOrSuspicious(candidateStr) {
             if (!candidateStr || typeof candidateStr !== 'string') return false;
+            if (PRIVATE_IP_REGEX.test(candidateStr)) return true;
             const parts = candidateStr.split(' ');
-            if (parts.length >= 5) {
-              const ip = parts[4];
-              if (PRIVATE_IP_REGEX.test(ip)) return true;
-              if (parts[7] === 'typ' && (parts[8] === 'host' || parts[8] === 'srflx')) {
-                if (PRIVATE_IP_REGEX.test(ip)) return true;
+            for (let i = 0; i < parts.length; i++) {
+              if (PRIVATE_IP_REGEX.test(parts[i])) return true;
+            }
+            if (candidateStr.includes(' typ host') && !candidateStr.includes('.local')) {
+              for (let i = 0; i < parts.length; i++) {
+                if (PRIVATE_IP_REGEX.test(parts[i])) return true;
               }
             }
             return false;
+          }
+
+          function sanitizeSdp(sdp) {
+            if (!sdp || typeof sdp !== 'string') return { sdp: sdp, modified: false };
+            const lines = sdp.split(/\\r\\n|\\n/);
+            const sanitizedLines = [];
+            let modified = false;
+
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              if (line.startsWith('a=candidate:')) {
+                if (isPrivateOrSuspicious(line)) {
+                  modified = true;
+                  continue;
+                }
+              } else if (line.startsWith('c=IN IP4 ')) {
+                const ip = line.slice(9).trim();
+                if (PRIVATE_IP_REGEX.test(ip)) {
+                  sanitizedLines.push('c=IN IP4 0.0.0.0');
+                  modified = true;
+                  continue;
+                }
+              }
+              sanitizedLines.push(line);
+            }
+
+            return {
+              sdp: sanitizedLines.join('\\r\\n'),
+              modified: modified
+            };
           }
 
           function dispatchIntervention(detail) {
@@ -1338,6 +1370,102 @@
 
             const pc = new OrigPeerConnection(safeConfig, constraints);
 
+            // Intercept createOffer to sanitize local candidate SDP
+            const origCreateOffer = pc.createOffer;
+            pc.createOffer = function() {
+              return origCreateOffer.apply(this, arguments).then(function(desc) {
+                if (desc && desc.sdp) {
+                  const res = sanitizeSdp(desc.sdp);
+                  if (res.modified) {
+                    dispatchIntervention('Scrubbed internal LAN IP candidates from WebRTC offer SDP');
+                    try {
+                      return new RTCSessionDescription({ type: desc.type, sdp: res.sdp });
+                    } catch(e) {
+                      desc.sdp = res.sdp;
+                    }
+                  }
+                }
+                return desc;
+              });
+            };
+
+            // Intercept createAnswer to sanitize answer SDP
+            const origCreateAnswer = pc.createAnswer;
+            pc.createAnswer = function() {
+              return origCreateAnswer.apply(this, arguments).then(function(desc) {
+                if (desc && desc.sdp) {
+                  const res = sanitizeSdp(desc.sdp);
+                  if (res.modified) {
+                    dispatchIntervention('Scrubbed internal LAN IP candidates from WebRTC answer SDP');
+                    try {
+                      return new RTCSessionDescription({ type: desc.type, sdp: res.sdp });
+                    } catch(e) {
+                      desc.sdp = res.sdp;
+                    }
+                  }
+                }
+                return desc;
+              });
+            };
+
+            // Intercept setLocalDescription
+            const origSetLocalDescription = pc.setLocalDescription;
+            pc.setLocalDescription = function(desc) {
+              if (desc && desc.sdp) {
+                const res = sanitizeSdp(desc.sdp);
+                if (res.modified) {
+                  dispatchIntervention('Sanitized internal LAN IP before setLocalDescription');
+                  try {
+                    arguments[0] = new RTCSessionDescription({ type: desc.type, sdp: res.sdp });
+                  } catch(e) {
+                    desc.sdp = res.sdp;
+                  }
+                }
+              }
+              return origSetLocalDescription.apply(this, arguments);
+            };
+
+            // Intercept setRemoteDescription
+            const origSetRemoteDescription = pc.setRemoteDescription;
+            pc.setRemoteDescription = function(desc) {
+              if (desc && desc.sdp) {
+                const res = sanitizeSdp(desc.sdp);
+                if (res.modified) {
+                  dispatchIntervention('Sanitized internal LAN IP before setRemoteDescription');
+                  try {
+                    arguments[0] = new RTCSessionDescription({ type: desc.type, sdp: res.sdp });
+                  } catch(e) {
+                    desc.sdp = res.sdp;
+                  }
+                }
+              }
+              return origSetRemoteDescription.apply(this, arguments);
+            };
+
+            // Virtualize localDescription getter
+            const origLocalDescription = Object.getOwnPropertyDescriptor(OrigPeerConnection.prototype, 'localDescription');
+            if (origLocalDescription && origLocalDescription.get) {
+              Object.defineProperty(pc, 'localDescription', {
+                get: function() {
+                  const desc = origLocalDescription.get.call(this);
+                  if (desc && desc.sdp) {
+                    const res = sanitizeSdp(desc.sdp);
+                    if (res.modified) {
+                      try {
+                        return new RTCSessionDescription({ type: desc.type, sdp: res.sdp });
+                      } catch(e) {
+                        desc.sdp = res.sdp;
+                      }
+                    }
+                  }
+                  return desc;
+                },
+                configurable: true,
+                enumerable: true
+              });
+            }
+
+            // Virtualize onicecandidate property
             let userCandidateHandler = null;
             Object.defineProperty(pc, 'onicecandidate', {
               get: function() {
@@ -1362,6 +1490,7 @@
               enumerable: true
             });
 
+            // Virtualize addEventListener for icecandidate
             const origAddEventListener = pc.addEventListener;
             pc.addEventListener = function(type, listener, options) {
               if (type === 'icecandidate' && typeof listener === 'function') {
@@ -1379,6 +1508,36 @@
               return origAddEventListener.apply(this, arguments);
             };
 
+            // Virtualize getStats to scrub local-candidate and candidate-pair IPs
+            const origGetStats = pc.getStats;
+            pc.getStats = function() {
+              return origGetStats.apply(this, arguments).then(function(statsReport) {
+                try {
+                  if (statsReport && typeof statsReport.forEach === 'function') {
+                    const sanitized = new Map();
+                    statsReport.forEach(function(report, id) {
+                      if (report && (report.type === 'local-candidate' || report.type === 'remote-candidate' || report.type === 'candidate-pair')) {
+                        const cloned = Object.assign({}, report);
+                        if (cloned.ip && PRIVATE_IP_REGEX.test(cloned.ip)) {
+                          cloned.ip = '0.0.0.0';
+                          dispatchIntervention('Scrubbed internal LAN IP from getStats report');
+                        }
+                        if (cloned.address && PRIVATE_IP_REGEX.test(cloned.address)) {
+                          cloned.address = '0.0.0.0';
+                          dispatchIntervention('Scrubbed internal LAN address from getStats report');
+                        }
+                        sanitized.set(id, cloned);
+                      } else {
+                        sanitized.set(id, report);
+                      }
+                    });
+                    return sanitized;
+                  }
+                } catch(e) {}
+                return statsReport;
+              });
+            };
+
             return pc;
           }
 
@@ -1391,6 +1550,32 @@
             window.RTCPeerConnection = ProxiedPeerConnection;
             if (window.webkitRTCPeerConnection) {
               window.webkitRTCPeerConnection = ProxiedPeerConnection;
+            }
+            if (window.mozRTCPeerConnection) {
+              window.mozRTCPeerConnection = ProxiedPeerConnection;
+            }
+          } catch(e) {}
+
+          // Secure iframe isolation against RTCPeerConnection leakage
+          try {
+            const origIframeContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+            if (origIframeContentWindow && origIframeContentWindow.get) {
+              Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+                get: function() {
+                  const win = origIframeContentWindow.get.call(this);
+                  if (win && !win.__bc_webrtc_shield_active) {
+                    try {
+                      win.RTCPeerConnection = ProxiedPeerConnection;
+                      if (win.webkitRTCPeerConnection) win.webkitRTCPeerConnection = ProxiedPeerConnection;
+                      if (win.mozRTCPeerConnection) win.mozRTCPeerConnection = ProxiedPeerConnection;
+                      win.__bc_webrtc_shield_active = true;
+                    } catch(e) {}
+                  }
+                  return win;
+                },
+                configurable: true,
+                enumerable: true
+              });
             }
           } catch(e) {}
         })();
