@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const enterprisePolicyStatusVal = document.getElementById('enterprisePolicyStatusVal');
   const enterpriseEnforcedKeysVal = document.getElementById('enterpriseEnforcedKeysVal');
   const enterprisePolicyHashVal = document.getElementById('enterprisePolicyHashVal');
+  const enterpriseWebRtcStatusVal = document.getElementById('enterpriseWebRtcStatusVal');
   const downloadGpoRegBtn = document.getElementById('downloadGpoRegBtn');
   const downloadGoogleAdminJsonBtn = document.getElementById('downloadGoogleAdminJsonBtn');
 
@@ -466,6 +467,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (enterprisePolicyHashVal) {
         enterprisePolicyHashVal.textContent = res.policyHash ? res.policyHash.slice(0, 24) + '...' : 'Unavailable';
+      }
+      if (enterpriseWebRtcStatusVal) {
+        if (res.webRtcPolicy === 'default_public_interface_only') {
+          enterpriseWebRtcStatusVal.textContent = 'Socket Shield Enforced';
+          enterpriseWebRtcStatusVal.style.color = '#34D399';
+        } else if (res.webRtcPolicy === 'disable_non_proxied_udp') {
+          enterpriseWebRtcStatusVal.textContent = 'UDP Proxy Shield';
+          enterpriseWebRtcStatusVal.style.color = '#34D399';
+        } else if (res.webRtcPolicy === 'default') {
+          enterpriseWebRtcStatusVal.textContent = 'Standard Public/LAN';
+          enterpriseWebRtcStatusVal.style.color = '#F59E0B';
+        } else {
+          enterpriseWebRtcStatusVal.textContent = res.webRtcPolicy || 'Active';
+          enterpriseWebRtcStatusVal.style.color = '#60A5FA';
+        }
       }
     });
   }
