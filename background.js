@@ -48,6 +48,7 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 
   chrome.action.setBadgeBackgroundColor({ color: '#3B82F6' });
+  enforceWebRtcPolicy();
 });
 
 // Shortcut commands listener (e.g. Alt+Z for Element Zapper)
@@ -94,11 +95,37 @@ function resolveEffectiveSettings(callback) {
   });
 }
 
-// Listen for dynamic policy updates from enterprise MDM / GPO
+// WebRTC Zero-Trust Network Defense: Chromium Socket-Level IP Policy
+function syncWebRtcHandlingPolicy(enabled) {
+  if (chrome.privacy && chrome.privacy.network && chrome.privacy.network.webRTCIPHandlingPolicy) {
+    const targetValue = enabled ? 'default_public_interface_only' : 'default';
+    chrome.privacy.network.webRTCIPHandlingPolicy.get({}, (details) => {
+      if (details && details.value !== targetValue && details.levelOfControl !== 'not_controllable') {
+        chrome.privacy.network.webRTCIPHandlingPolicy.set({ value: targetValue }, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('[BrowseClean] WebRTC socket policy enforcement error:', chrome.runtime.lastError.message);
+          }
+        });
+      }
+    });
+  }
+}
+
+function enforceWebRtcPolicy() {
+  resolveEffectiveSettings((effective) => {
+    syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak);
+  });
+}
+
+// Initial WebRTC socket policy verification at worker startup
+enforceWebRtcPolicy();
+
+// Listen for dynamic policy updates from enterprise MDM / GPO and local storage
 if (chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'managed') {
       resolveEffectiveSettings((effective, lockedKeys, isManaged) => {
+        syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak);
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach(tab => {
             if (tab && tab.id) {
@@ -111,6 +138,10 @@ if (chrome.storage && chrome.storage.onChanged) {
             }
           });
         });
+      });
+    } else if (area === 'local' && changes.settings) {
+      resolveEffectiveSettings((effective) => {
+        syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak);
       });
     }
   });
@@ -337,6 +368,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const payloadToHash = JSON.stringify({ settings, lockedKeys, isManaged });
       const policyHash = await computeSha256(payloadToHash);
 
+      let webRtcPolicy = 'unsupported';
+      if (chrome.privacy && chrome.privacy.network && chrome.privacy.network.webRTCIPHandlingPolicy) {
+        try {
+          const details = await new Promise((resolve) => {
+            chrome.privacy.network.webRTCIPHandlingPolicy.get({}, resolve);
+          });
+          webRtcPolicy = (details && details.value) ? details.value : 'unknown';
+        } catch (e) {
+          webRtcPolicy = 'error';
+        }
+      }
+
       sendResponse({
         isManaged: isManaged,
         managedSettings: managedSettings || {},
@@ -345,7 +388,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         totalSchemaKeys: schemaKeys.length,
         schemaKeys: schemaKeys,
         extensionId: extensionId,
-        settings: settings
+        settings: settings,
+        webRtcPolicy: webRtcPolicy
       });
     });
     return true;
