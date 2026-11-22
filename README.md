@@ -28,7 +28,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Viewport Reclaim Engine**: Compresses oversized sticky navigation bars and un-sticks floating announcement ribbons and bottom promotional docks on scroll.
 * **Session Replay & DOM Spy Neutralizer (DLP)**: Stubs and neutralizes Hotjar, FullStory, LogRocket, Clarity, and keystroke surveillance recorders to stop unauthorized corporate data harvesting.
 * **Anti-Tamper & Form DLP Shield**: Shields sensitive credential and payment input fields from unauthorized script harvesting, and isolates DOM prototypes against malicious poisoning.
-* **WebRTC & Internal IP Leak Shield**: Intercepts STUN/ICE host candidate discovery to prevent local LAN IP leaks and corporate VPN bypass deanonymization.
+* **WebRTC Private LAN IP Leak Shield (Zero-Trust Network Defense)**: Dual-layer zero-trust architecture combining Chromium socket-level policy (`default_public_interface_only`) with in-page SDP and RTCPeerConnection virtualization to completely block internal LAN IP leaks (RFC 1918, RFC 3927, RFC 4193), carrier-grade NAT discovery, and VPN bypass deanonymization.
 * **Homoglyph & Punycode Phishing Detector**: Detects deceptive IDN Punycode domains, mixed-script homoglyphs, and lookalike brand impersonation, rendering an active security warning barrier.
 * **Bidirectional Clipboard DLP & Watermark Sanitizer**: Scrubs invisible zero-width tracking watermarks from copied text and shields high-risk API keys from clipboard siphoning.
 * **Cryptographic Audit Logging (Native Web Crypto API)**: Maintains an on-device, sequential SHA-256 hash-chained ledger powered by `crypto.subtle.digest('SHA-256')`. Each intervention block binds to the preceding block's hash, enabling client-side mathematical verification of zero tampering or record deletion, exportable as signed JSON and CSV compliance packages.
@@ -47,6 +47,7 @@ BrowseClean requests the minimum permissions required to function locally:
 | `storage` | Stores user toggle preferences and domain whitelist locally on your machine via `chrome.storage.local`. |
 | `activeTab` | Allows the popup to query the active tab's domain and clean state. |
 | `tabs` | Updates the blocked element counter badge on the extension toolbar icon. |
+| `privacy` | Enforces `chrome.privacy.network.webRTCIPHandlingPolicy` (`default_public_interface_only`) to block internal LAN IP leakage at the browser socket level. |
 
 The extension contains **zero** network requests (`fetch`, `XMLHttpRequest`, `WebSocket`, or analytics beacons).
 
@@ -129,6 +130,24 @@ BrowseClean maintains a fully client-side, sequential cryptographic hash-chained
   `EntryHash = SHA256(sequence | timestamp | domain | category | action | details | prevHash)`
 * **Tamper-Evident Verification**: The Options dashboard provides a mathematical integrity auditor that traverses the entire chain from Genesis to root. Any altered field, deleted record, or reordered sequence invalidates subsequent block hashes and flags the exact index of the compromised block.
 * **Compliance Manifest**: Exports a structured SOC 2 / ISO 27001 compliance verification package containing the ledger root hash, sequence proofs, and cryptographic verification status with zero external network dependencies.
+
+---
+
+## Zero-Trust Network Defense: WebRTC Private LAN IP Leak Shield
+
+Modern web applications can invoke WebRTC's ICE/STUN discovery mechanism to silently extract a user's internal local area network IP addresses (such as `192.168.x.x` or `10.x.x.x`), even behind corporate VPNs or commercial proxies.
+
+BrowseClean defends against this via a **dual-layer zero-trust architecture**:
+
+1. **Tier 1: Chromium Socket-Level Policy (`chrome.privacy.network`)**:
+   Enforces `webRTCIPHandlingPolicy = 'default_public_interface_only'` across the entire browser instance. At the Chromium C++ socket layer, WebRTC is prohibited from binding to non-default internal network interfaces, preventing RFC 1918, RFC 3927, RFC 4193, and carrier-grade NAT address disclosure.
+
+2. **Tier 2: In-Memory SDP & RTCPeerConnection Virtualization (`engine.js`)**:
+   - Strips untrusted STUN/TURN servers from connection configurations.
+   - Rewrites Session Description Protocol (SDP) payloads in `createOffer()`, `createAnswer()`, `setLocalDescription()`, and `setRemoteDescription()` to remove private IP candidate lines.
+   - Proxies `pc.onicecandidate`, `addEventListener('icecandidate')`, and `getStats()` to scrub local candidate IP and address reports.
+   - Secures dynamic `<iframe>` creation against window prototype extraction.
+   - Whitelists legitimate enterprise collaboration suites (`meet.google.com`, `teams.microsoft.com`, `zoom.us`, `webex.com`, `slack.com`, `discord.com`).
 
 ---
 
