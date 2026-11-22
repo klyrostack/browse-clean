@@ -177,8 +177,8 @@
 
           <div class="row">
             <div class="row-meta">
-              <span class="row-title">WebRTC & IP Leak Shield</span>
-              <span class="row-desc">Neutralizes WebRTC STUN/ICE host candidate discovery to prevent corporate LAN IP leaks and VPN deanonymization.</span>
+              <span class="row-title">WebRTC Private LAN IP Leak Shield</span>
+              <span class="row-desc">Zero-Trust Network Defense: Enforces Chromium socket policy (default_public_interface_only) and virtualizes in-page RTCPeerConnection/SDP to prevent local LAN IP disclosure and VPN bypass.</span>
             </div>
             <label class="switch">
               <input type="checkbox" id="opt-webrtc" checked>
@@ -389,6 +389,10 @@
             <div class="audit-stat-box">
               <span class="audit-stat-val mono" id="enterprisePolicyHashVal">Computing...</span>
               <span class="audit-stat-lbl">Policy Fingerprint (SHA-256)</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="enterpriseWebRtcStatusVal">Socket Shield Active</span>
+              <span class="audit-stat-lbl">WebRTC Zero-Trust Policy</span>
             </div>
           </div>
 
