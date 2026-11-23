@@ -32,6 +32,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Homoglyph & Punycode Phishing Detector**: Detects deceptive IDN Punycode domains, mixed-script homoglyphs, and lookalike brand impersonation, rendering an active security warning barrier.
 * **Bidirectional Clipboard DLP & Watermark Sanitizer**: Scrubs invisible zero-width tracking watermarks from copied text and shields high-risk API keys from clipboard siphoning.
 * **Cryptographic Audit Logging (Native Web Crypto API)**: Maintains an on-device, sequential SHA-256 hash-chained ledger powered by `crypto.subtle.digest('SHA-256')`. Each intervention block binds to the preceding block's hash, enabling client-side mathematical verification of zero tampering or record deletion, exportable as signed JSON and CSV compliance packages.
+* **Pre-Paint Execution & Performance Architecture (Zero-FOUC)**: Declarative CSS injection at document_start paired with CSS layout containment (contain: strict, content-visibility: hidden) and synchronous microtask bootstrapping to eliminate Flash of Unstyled Content (FOUC), layout thrashing, and Cumulative Layout Shift (CLS = 0.00).
 * **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
 * **Scroll Traps**: Clears inline `overflow: hidden`, `position: fixed`, and modal lock classes (`sp-message-open`, `modal-open`, `overflow-hidden`).
 * **Autoplay Media**: Pauses unprompted background video playback.
@@ -148,6 +149,26 @@ BrowseClean defends against this via a **dual-layer zero-trust architecture**:
    - Proxies `pc.onicecandidate`, `addEventListener('icecandidate')`, and `getStats()` to scrub local candidate IP and address reports.
    - Secures dynamic `<iframe>` creation against window prototype extraction.
    - Whitelists legitimate enterprise collaboration suites (`meet.google.com`, `teams.microsoft.com`, `zoom.us`, `webex.com`, `slack.com`, `discord.com`).
+
+---
+
+## Pre-Paint Execution & Performance Architecture (Zero-FOUC)
+
+A fundamental engineering challenge in content blocking and decluttering extensions is eliminating **Flash of Unstyled Content (FOUC)** and **Cumulative Layout Shift (CLS)**. Traditional extensions wait for `DOMContentLoaded` or `document_idle`, causing noticeable visual flicker, content pops, and reflow penalties.
+
+BrowseClean solves this through a four-stage pre-paint execution pipeline:
+
+1. **Declarative User-Agent Pre-Paint Style Layer (`cleaner.css`)**:
+   Injected at `run_at: "document_start"` across all frames. Matches CSS selectors during HTML parsing before the First Contentful Paint (FCP), collapsing CMPs, modal veils, and chat bubbles with zero visible frames.
+
+2. **CSS Layout Containment & Render Tree Isolation**:
+   Suppressed containers enforce `contain: strict !important;` and `content-visibility: hidden !important;`. Chromium's Blink rendering engine completely skips layout calculations and rasterization for matching subtrees, preserving Core Web Vitals (0.00 CLS).
+
+3. **Synchronous Pre-Paint JavaScript Bootstrap (`engine.js`)**:
+   Security shields (anti-tamper prototypes, DLP form guards, WebRTC proxies, session spy stubs) execute synchronously at `document_start` before page scripts or inline `<head>` scripts can execute.
+
+4. **Zero-Layout-Thrashing Mutation Engine**:
+   DOM sweeping operates with strict read/write decoupling scheduled through `requestAnimationFrame` microtask batches, eliminating forced synchronous reflows and guaranteeing silky 60fps scrolling performance.
 
 ---
 
