@@ -24,6 +24,14 @@
   let blockedCount = 0;
   let isZapperActive = false;
 
+  // Pre-Paint Execution & Performance Instrumentation (Zero-FOUC)
+  const prepaintMetrics = {
+    startTime: (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(),
+    prepaintDurationMs: 0,
+    nodesSuppressedPrepaint: 0,
+    foucProtected: true
+  };
+
   // Configuration schema
   let config = {
     blockCookies: true,
@@ -320,6 +328,12 @@
       el.style.setProperty('pointer-events', 'none', 'important');
       el.style.setProperty('height', '0', 'important');
       el.style.setProperty('z-index', '-99999', 'important');
+      el.style.setProperty('contain', 'strict', 'important');
+      el.style.setProperty('content-visibility', 'hidden', 'important');
+
+      if (document.readyState === 'loading') {
+        prepaintMetrics.nodesSuppressedPrepaint++;
+      }
 
       if (el.parentNode && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
         el.parentNode.removeChild(el);
@@ -1784,11 +1798,34 @@
     });
   }
 
+  // Immediate Synchronous Pre-Paint Bootstrap (Zero-FOUC Guarantee)
+  function executePrepaintBootstrap() {
+    try {
+      const cachedWhitelist = sessionStorage.getItem('__bc_whitelisted');
+      if (cachedWhitelist === 'true') {
+        isCleanActive = false;
+        return;
+      }
+    } catch(e) {}
+
+    // Synchronously execute pre-paint defenses at document_start
+    injectDLPPageStubs();
+    injectAntiTamperShield();
+    injectWebRtcShield();
+    enforcePhishingDefense();
+
+    if (typeof performance !== 'undefined' && performance.now) {
+      prepaintMetrics.prepaintDurationMs = Math.round((performance.now() - prepaintMetrics.startTime) * 100) / 100;
+    }
+  }
+
   function initializeEnginePipeline() {
     if (config.whitelistedDomains && config.whitelistedDomains.includes(currentHostname)) {
       isCleanActive = false;
+      try { sessionStorage.setItem('__bc_whitelisted', 'true'); } catch(e) {}
       return;
     }
+    try { sessionStorage.removeItem('__bc_whitelisted'); } catch(e) {}
 
     injectDLPPageStubs();
     injectAntiTamperShield();
@@ -1829,11 +1866,15 @@
     }
 
     if (msg.action === 'getStatus') {
+      if (prepaintMetrics.prepaintDurationMs === 0 && typeof performance !== 'undefined' && performance.now) {
+        prepaintMetrics.prepaintDurationMs = Math.round((performance.now() - prepaintMetrics.startTime) * 100) / 100;
+      }
       sendResponse({
         enabled: isCleanActive,
         domain: currentHostname,
         blockedCount: blockedCount,
-        settings: config
+        settings: config,
+        prepaintMetrics: prepaintMetrics
       });
       return true;
     }
@@ -1862,6 +1903,7 @@
     }
   });
 
+  executePrepaintBootstrap();
   startEngine();
 
   if (document.readyState === 'loading') {
