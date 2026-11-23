@@ -5,6 +5,21 @@
  */
 
 /* ==========================================================================
+   0. PRE-PAINT ZERO-FOUC & LAYOUT CONTAINMENT ARCHITECTURE
+   Enforces rendering isolation and anti-layout-shift rules at document_start
+   ========================================================================== */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeSpeed;
+}
+
+[data-bc-scrubbed="true"] {
+  display: none !important;
+  contain: strict !important;
+  content-visibility: hidden !important;
+}
+
+/* ==========================================================================
    1. COOKIE CONSENT WALLS & CMPs (Sourcepoint, OneTrust, Cookiebot, etc.)
    ========================================================================== */
 div[id^="sp_message_container"],
@@ -74,6 +89,8 @@ div[class*="consent-layer" i] {
   max-height: 0 !important;
   overflow: hidden !important;
   z-index: -99999 !important;
+  contain: strict !important;
+  content-visibility: hidden !important;
 }
 
 /* ==========================================================================
@@ -109,6 +126,8 @@ div[id^="help-scout-beacon"] {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
+  contain: strict !important;
+  content-visibility: hidden !important;
 }
 
 /* ==========================================================================
@@ -135,6 +154,8 @@ div[class*="email-signup" i][style*="fixed"] {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
+  contain: strict !important;
+  content-visibility: hidden !important;
 }
 
 /* ==========================================================================
@@ -165,6 +186,8 @@ div[class*="fc-dialog-container"] {
   max-height: 0 !important;
   overflow: hidden !important;
   z-index: -99999 !important;
+  contain: strict !important;
+  content-visibility: hidden !important;
 }
 
 /* ==========================================================================
@@ -218,6 +241,8 @@ div[id*="auth-modal" i] {
   max-height: 0 !important;
   overflow: hidden !important;
   z-index: -99999 !important;
+  contain: strict !important;
+  content-visibility: hidden !important;
 }
 
 /* ==========================================================================
@@ -350,6 +375,8 @@ div[class*="fs-mask"] {
   max-height: 0 !important;
   overflow: hidden !important;
   z-index: -99999 !important;
+  contain: strict !important;
+  content-visibility: hidden !important;
 }
 
 /* ==========================================================================
