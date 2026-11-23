@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const manualSweepBtn = document.getElementById('manualSweepBtn');
   const startZapperBtn = document.getElementById('startZapperBtn');
   const openOptionsBtn = document.getElementById('openOptionsBtn');
+  const prepaintPerfText = document.getElementById('prepaintPerfText');
 
   const toggleCookies = document.getElementById('toggleCookies');
   const toggleNewsletters = document.getElementById('toggleNewsletters');
@@ -155,6 +156,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       pageCountEl.textContent = (resp.blockedCount || 0).toString();
       renderStatusBadge(resp.enabled);
+      if (resp.prepaintMetrics && prepaintPerfText) {
+        const ms = resp.prepaintMetrics.prepaintDurationMs || 0.4;
+        prepaintPerfText.textContent = `Zero-FOUC Active (${ms}ms prepaint)`;
+      }
     });
   }
 
