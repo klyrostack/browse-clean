@@ -175,15 +175,24 @@
             </label>
           </div>
 
-          <div class="row">
-            <div class="row-meta">
-              <span class="row-title">WebRTC Private LAN IP Leak Shield</span>
-              <span class="row-desc">Zero-Trust Network Defense: Enforces Chromium socket policy (default_public_interface_only) and virtualizes in-page RTCPeerConnection/SDP to prevent local LAN IP disclosure and VPN bypass.</span>
+          <div class="row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <div class="row-meta">
+                <span class="row-title">WebRTC Private LAN IP Leak Shield</span>
+                <span class="row-desc">Zero-Trust Network Defense: Enforces Chromium socket policy and virtualizes in-page RTCPeerConnection/SDP to prevent local LAN IP disclosure and VPN bypass.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-webrtc" checked>
+                <span class="slider"></span>
+              </label>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="opt-webrtc" checked>
-              <span class="slider"></span>
-            </label>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
+              <span style="font-size: 12px; color: var(--text-muted);">Enforcement Level:</span>
+              <select id="opt-webrtc-mode" class="select-input" style="background: #18181b; color: #e4e4e7; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 12px;">
+                <option value="default_public_interface_only">Public Interface Only (Recommended)</option>
+                <option value="disable_non_proxied_udp">Disable Non-Proxied UDP (Strict Zero-Trust)</option>
+              </select>
+            </div>
           </div>
 
           <div class="row">
@@ -453,6 +462,22 @@
             </div>
             <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase;">Optimized</span>
           </div>
+        </div>
+
+        <div class="pane-header" style="margin-top: 36px;">
+          <h1>Zero-Trust WebRTC Network Defense & Live Audit</h1>
+          <p class="subtitle">Real-time STUN/ICE leakage verification, socket-level policy validation, and in-browser IP disclosure simulation.</p>
+        </div>
+
+        <div class="card">
+          <div class="action-row">
+            <div>
+              <span class="action-title">Run WebRTC Leak Audit</span>
+              <p class="action-desc">Initiates an active client-side STUN ICE gathering session to mathematically verify that zero RFC 1918 or private network interfaces are leaked to WebRTC peers.</p>
+            </div>
+            <button id="runWebRtcAuditBtn" class="btn btn-secondary">Audit WebRTC Shield</button>
+          </div>
+          <div id="webrtcAuditResultBox" class="audit-verify-alert" style="display: none;"></div>
         </div>
       </section>
     </main>
