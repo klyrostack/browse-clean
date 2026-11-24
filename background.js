@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS = {
   auditLogging: true,
   antiTamperDlp: true,
   blockWebRtcLeak: true,
+  webRtcPolicyMode: 'default_public_interface_only',
   blockPhishingSpoofs: true,
   clipboardDlp: true,
   whitelistedDomains: [],
@@ -96,9 +97,11 @@ function resolveEffectiveSettings(callback) {
 }
 
 // WebRTC Zero-Trust Network Defense: Chromium Socket-Level IP Policy
-function syncWebRtcHandlingPolicy(enabled) {
+function syncWebRtcHandlingPolicy(enabled, mode) {
   if (chrome.privacy && chrome.privacy.network && chrome.privacy.network.webRTCIPHandlingPolicy) {
-    const targetValue = enabled ? 'default_public_interface_only' : 'default';
+    const validModes = ['default_public_interface_only', 'disable_non_proxied_udp'];
+    const chosenMode = validModes.includes(mode) ? mode : 'default_public_interface_only';
+    const targetValue = enabled ? chosenMode : 'default';
     chrome.privacy.network.webRTCIPHandlingPolicy.get({}, (details) => {
       if (details && details.value !== targetValue && details.levelOfControl !== 'not_controllable') {
         chrome.privacy.network.webRTCIPHandlingPolicy.set({ value: targetValue }, () => {
@@ -113,7 +116,7 @@ function syncWebRtcHandlingPolicy(enabled) {
 
 function enforceWebRtcPolicy() {
   resolveEffectiveSettings((effective) => {
-    syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak);
+    syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak, effective.webRtcPolicyMode);
   });
 }
 
@@ -125,7 +128,7 @@ if (chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'managed') {
       resolveEffectiveSettings((effective, lockedKeys, isManaged) => {
-        syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak);
+        syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak, effective.webRtcPolicyMode);
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach(tab => {
             if (tab && tab.id) {
@@ -141,7 +144,7 @@ if (chrome.storage && chrome.storage.onChanged) {
       });
     } else if (area === 'local' && changes.settings) {
       resolveEffectiveSettings((effective) => {
-        syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak);
+        syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak, effective.webRtcPolicyMode);
       });
     }
   });
@@ -363,7 +366,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         'stopAutoplay', 'blockNotifications', 'blockSurveys', 'unblurContent',
         'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
         'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
-        'blockWebRtcLeak', 'blockPhishingSpoofs', 'clipboardDlp'
+        'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp'
       ];
       const payloadToHash = JSON.stringify({ settings, lockedKeys, isManaged });
       const policyHash = await computeSha256(payloadToHash);
@@ -392,6 +395,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         webRtcPolicy: webRtcPolicy
       });
     });
+    return true;
+  }
+
+  if (message.action === 'getWebRtcSocketDiagnostics') {
+    if (chrome.privacy && chrome.privacy.network && chrome.privacy.network.webRTCIPHandlingPolicy) {
+      chrome.privacy.network.webRTCIPHandlingPolicy.get({}, (details) => {
+        sendResponse({
+          supported: true,
+          value: details ? details.value : 'unknown',
+          levelOfControl: details ? details.levelOfControl : 'unknown'
+        });
+      });
+    } else {
+      sendResponse({
+        supported: false,
+        value: 'unsupported',
+        levelOfControl: 'not_controllable'
+      });
+    }
     return true;
   }
 });
