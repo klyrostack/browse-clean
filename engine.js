@@ -1456,28 +1456,51 @@
               return origSetRemoteDescription.apply(this, arguments);
             };
 
-            // Virtualize localDescription getter
-            const origLocalDescription = Object.getOwnPropertyDescriptor(OrigPeerConnection.prototype, 'localDescription');
-            if (origLocalDescription && origLocalDescription.get) {
-              Object.defineProperty(pc, 'localDescription', {
-                get: function() {
-                  const desc = origLocalDescription.get.call(this);
-                  if (desc && desc.sdp) {
-                    const res = sanitizeSdp(desc.sdp);
-                    if (res.modified) {
-                      try {
-                        return new RTCSessionDescription({ type: desc.type, sdp: res.sdp });
-                      } catch(e) {
-                        desc.sdp = res.sdp;
+            // Intercept addIceCandidate to drop private LAN candidate injections
+            const origAddIceCandidate = pc.addIceCandidate;
+            pc.addIceCandidate = function(candidate, successCallback, failureCallback) {
+              if (candidate) {
+                const candStr = typeof candidate === 'string' ? candidate : (candidate.candidate || '');
+                if (isPrivateOrSuspicious(candStr)) {
+                  dispatchIntervention('Dropped private LAN candidate in addIceCandidate');
+                  if (typeof successCallback === 'function') successCallback();
+                  return Promise.resolve();
+                }
+              }
+              return origAddIceCandidate.apply(this, arguments);
+            };
+
+            // Virtualize local and remote description getters across all SDP properties
+            function virtualizeSdpGetter(target, prop) {
+              const origDescriptor = Object.getOwnPropertyDescriptor(OrigPeerConnection.prototype, prop);
+              if (origDescriptor && origDescriptor.get) {
+                Object.defineProperty(target, prop, {
+                  get: function() {
+                    const desc = origDescriptor.get.call(this);
+                    if (desc && desc.sdp) {
+                      const res = sanitizeSdp(desc.sdp);
+                      if (res.modified) {
+                        try {
+                          return new RTCSessionDescription({ type: desc.type, sdp: res.sdp });
+                        } catch(e) {
+                          desc.sdp = res.sdp;
+                        }
                       }
                     }
-                  }
-                  return desc;
-                },
-                configurable: true,
-                enumerable: true
-              });
+                    return desc;
+                  },
+                  configurable: true,
+                  enumerable: true
+                });
+              }
             }
+
+            [
+              'localDescription', 'currentLocalDescription', 'pendingLocalDescription',
+              'remoteDescription', 'currentRemoteDescription', 'pendingRemoteDescription'
+            ].forEach(function(p) {
+              virtualizeSdpGetter(pc, p);
+            });
 
             // Virtualize onicecandidate property
             let userCandidateHandler = null;
@@ -1567,6 +1590,26 @@
             }
             if (window.mozRTCPeerConnection) {
               window.mozRTCPeerConnection = ProxiedPeerConnection;
+            }
+          } catch(e) {}
+
+          // Secure RTCIceCandidate constructor against manual candidate fabrication
+          try {
+            const OrigIceCandidate = window.RTCIceCandidate;
+            if (OrigIceCandidate) {
+              function ProxiedIceCandidate(initDict) {
+                if (initDict && initDict.candidate) {
+                  if (isPrivateOrSuspicious(initDict.candidate)) {
+                    dispatchIntervention('Sanitized candidate in RTCIceCandidate constructor');
+                    initDict = Object.assign({}, initDict, {
+                      candidate: ''
+                    });
+                  }
+                }
+                return new OrigIceCandidate(initDict);
+              }
+              ProxiedIceCandidate.prototype = OrigIceCandidate.prototype;
+              window.RTCIceCandidate = ProxiedIceCandidate;
             }
           } catch(e) {}
 
