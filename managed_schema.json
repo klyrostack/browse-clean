@@ -87,6 +87,12 @@
       "description": "Enforce Zero-Trust defense by neutralizing WebRTC STUN/ICE private IP discovery and VPN deanonymization.",
       "type": "boolean"
     },
+    "webRtcPolicyMode": {
+      "title": "WebRTC Policy Enforcement Mode",
+      "description": "Zero-Trust socket policy: default_public_interface_only (default) or disable_non_proxied_udp (strict proxy isolation).",
+      "type": "string",
+      "enum": ["default_public_interface_only", "disable_non_proxied_udp"]
+    },
     "blockPhishingSpoofs": {
       "title": "Block Phishing & Homoglyph Spoofs",
       "description": "Enforce anti-spoofing defense by detecting Punycode IDNs, mixed-script homoglyphs, and lookalike brand impersonation.",
