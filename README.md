@@ -141,14 +141,18 @@ Modern web applications can invoke WebRTC's ICE/STUN discovery mechanism to sile
 BrowseClean defends against this via a **dual-layer zero-trust architecture**:
 
 1. **Tier 1: Chromium Socket-Level Policy (`chrome.privacy.network`)**:
-   Enforces `webRTCIPHandlingPolicy = 'default_public_interface_only'` across the entire browser instance. At the Chromium C++ socket layer, WebRTC is prohibited from binding to non-default internal network interfaces, preventing RFC 1918, RFC 3927, RFC 4193, and carrier-grade NAT address disclosure.
+   - Enforces configurable socket-level policy: `default_public_interface_only` (standard) or `disable_non_proxied_udp` (strict enterprise lockdown).
+   - Prohibits WebRTC sockets at Chromium's C++ network layer from binding to non-default internal interfaces, preventing RFC 1918, RFC 3927, RFC 4193, and carrier-grade NAT address disclosure across all frames and background workers.
 
 2. **Tier 2: In-Memory SDP & RTCPeerConnection Virtualization (`engine.js`)**:
    - Strips untrusted STUN/TURN servers from connection configurations.
    - Rewrites Session Description Protocol (SDP) payloads in `createOffer()`, `createAnswer()`, `setLocalDescription()`, and `setRemoteDescription()` to remove private IP candidate lines.
+   - Virtualizes all six session description getters (`localDescription`, `currentLocalDescription`, `pendingLocalDescription`, `remoteDescription`, `currentRemoteDescription`, `pendingRemoteDescription`) so direct `.sdp` reads return scrubbed payloads.
+   - Intercepts `addIceCandidate()` and `RTCIceCandidate` constructor to drop private LAN candidate injections.
    - Proxies `pc.onicecandidate`, `addEventListener('icecandidate')`, and `getStats()` to scrub local candidate IP and address reports.
    - Secures dynamic `<iframe>` creation against window prototype extraction.
    - Whitelists legitimate enterprise collaboration suites (`meet.google.com`, `teams.microsoft.com`, `zoom.us`, `webex.com`, `slack.com`, `discord.com`).
+   - Includes an interactive **Live WebRTC Leak Audit Simulator** in the Options dashboard to mathematically verify zero address disclosure.
 
 ---
 
