@@ -176,6 +176,35 @@ BrowseClean solves this through a four-stage pre-paint execution pipeline:
 
 ---
 
+## Enterprise SIEM Ingestion & Standardized Event Schemas (CEF / ECS / RFC 5424)
+
+BrowseClean bridges client-side endpoint defense with enterprise Security Operations Center (SOC) pipelines by serializing cryptographic audit events into standard enterprise logging formats and streaming them to centralized SIEM ingestion collectors.
+
+### Supported Standardized Event Schemas
+
+1. **Elastic Common Schema (ECS 8.11 / NDJSON)**:
+   - Formats intervention events into normalized JSON objects categorized under ECS taxonomy (`event.category`, `event.type`, `event.action`, `url.domain`, `service.name`, `host.name`, `hash.sha256`).
+   - Supports single event JSON streaming and Newline Delimited JSON (NDJSON) batch payloads ready for direct bulk ingestion into Elasticsearch, Logstash, and Kibana dashboards.
+
+2. **ArcSight / Splunk Common Event Format (CEF:0)**:
+   - Formats events into standard pipe-delimited CEF header syntax:
+     `CEF:0|BrowseClean|EndpointShield|1.1.0|<category>|<eventName>|<severity>|<extensions>`
+   - Serializes security metadata including receipt timestamp (`rt`), destination host (`dhost`), action (`act`), sequence counter (`cn1`), cryptographic previous hash (`cs1`), block hash (`cs2`), and event identifiers (`externalId`).
+
+3. **IETF RFC 5424 Syslog Protocol**:
+   - Formats security logs according to the modern Syslog standard:
+     `<PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID [STRUCTURED-DATA] MSG`
+   - Dynamically calculates priority (`PRI`) based on `authpriv` facility (10) and threat severity (Notice, Warning, Error), encoding structured parameter sets (`[audit@53288 ...]`) for seamless ingestion into rsyslog, syslog-ng, Datadog, or Microsoft Sentinel syslog forwarders.
+
+### Streaming Pipeline & Air-Gapped Export Suite
+
+- **In-Memory Forwarder Queue**: Events are buffered in memory and batched according to enterprise policy (`siemBatchSize`), automatically dispatched via HTTP POST with custom authorization headers (e.g., `Splunk <HEC-TOKEN>` or `Bearer <TOKEN>`).
+- **Resilient Retry Handling**: Outbound failures (network drops, HTTP 4xx/5xx) are automatically caught and retained in memory with exponential retry buffering.
+- **Air-Gapped Compliance Suite**: Direct 1-click export of the active cryptographic ledger into `.ndjson`, `.cef`, and `.log` files from the Options dashboard for air-gapped forensic audits and offline SIEM ingestion.
+- **Canary Heartbeat Probe**: Interactive test harness to verify SSL termination, token authorization, and ingestion pipeline reachability on demand.
+
+---
+
 ## License
 
 MIT © 2026 Klyrostack
