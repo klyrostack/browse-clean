@@ -365,6 +365,30 @@
 
           <div class="action-row">
             <div>
+              <span class="action-title">Export Elastic Common Schema (NDJSON)</span>
+              <p class="action-desc">Export audit records formatted in standard Elastic Common Schema 8.11 for direct bulk ingestion into Elasticsearch and Kibana.</p>
+            </div>
+            <button id="exportEcsBtn" class="btn btn-secondary">Download NDJSON</button>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Export Common Event Format (CEF)</span>
+              <p class="action-desc">Export events formatted in ArcSight / Splunk Common Event Format (CEF:0) with header signatures and extension metadata.</p>
+            </div>
+            <button id="exportCefBtn" class="btn btn-secondary">Download CEF</button>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Export RFC 5424 Syslog (.log)</span>
+              <p class="action-desc">Export standard IETF RFC 5424 Syslog messages with authpriv facility, structured data, and microsecond timestamps.</p>
+            </div>
+            <button id="exportSyslogBtn" class="btn btn-secondary">Download Syslog</button>
+          </div>
+
+          <div class="action-row">
+            <div>
               <span class="action-title">Export Audit Trail (CSV)</span>
               <p class="action-desc">Export tabular audit records (timestamp, domain, category, action, details) for corporate security review.</p>
             </div>
@@ -378,6 +402,90 @@
             </div>
             <button id="clearAuditLogBtn" class="btn btn-danger">Clear Audit Log</button>
           </div>
+        </div>
+
+        <div class="pane-header" style="margin-top: 36px;">
+          <h1>Enterprise SIEM & Syslog Pipeline</h1>
+          <p class="subtitle">Real-time telemetry streaming and standardized event ingestion into Splunk, Elastic SIEM, Microsoft Sentinel, and Syslog collectors.</p>
+        </div>
+
+        <div class="card">
+          <div class="audit-status-grid">
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="siemBufferVal">0</span>
+              <span class="audit-stat-lbl">Queued Events</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="siemDispatchedVal">0</span>
+              <span class="audit-stat-lbl">Dispatched Events</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="siemStatusVal">Idle</span>
+              <span class="audit-stat-lbl">Forwarder Status</span>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Real-Time SIEM Event Forwarding</span>
+              <span class="row-desc">Automatically streams cryptographic intervention events to an enterprise SIEM webhook or collector endpoint.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-siem-forwarding">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+            <div class="row-meta" style="width: 100%;">
+              <span class="row-title">SIEM Ingestion Endpoint URL</span>
+              <span class="row-desc">HTTPS URL for the enterprise SIEM collector (e.g. Splunk HEC: <code>https://splunk.corp.net:8088/services/collector/raw</code> or Elastic HTTP endpoint).</span>
+            </div>
+            <input type="text" id="opt-siem-endpoint" placeholder="https://siem-collector.corp.internal:8088/services/collector/raw" style="width: 100%; box-sizing: border-box;">
+          </div>
+
+          <div class="row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+            <div class="row-meta" style="width: 100%;">
+              <span class="row-title">SIEM Authorization Header</span>
+              <span class="row-desc">Optional Authorization header string passed with outgoing HTTP POST requests (e.g. <code>Splunk &lt;HEC-TOKEN&gt;</code> or <code>Bearer &lt;TOKEN&gt;</code>).</span>
+            </div>
+            <input type="password" id="opt-siem-auth" placeholder="Splunk 00000000-0000-0000-0000-000000000000" style="width: 100%; box-sizing: border-box;">
+          </div>
+
+          <div class="row" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="row-meta">
+              <span class="row-title">Standard Event Schema</span>
+              <span class="row-desc">Format applied to dispatched telemetry batches.</span>
+            </div>
+            <select id="opt-siem-format" class="select-input" style="background: #18181b; color: #e4e4e7; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 12px;">
+              <option value="ecs_json">Elastic Common Schema (ECS NDJSON)</option>
+              <option value="cef">Common Event Format (CEF ArcSight / Splunk)</option>
+              <option value="rfc5424">RFC 5424 Syslog Protocol</option>
+            </select>
+          </div>
+
+          <div class="row" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="row-meta">
+              <span class="row-title">Batch Buffer Size</span>
+              <span class="row-desc">Number of events accumulated in memory before triggering an outbound dispatch.</span>
+            </div>
+            <select id="opt-siem-batch-size" class="select-input" style="background: #18181b; color: #e4e4e7; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 12px;">
+              <option value="1">1 (Immediate Dispatch)</option>
+              <option value="5">5 Events</option>
+              <option value="10" selected>10 Events (Recommended)</option>
+              <option value="25">25 Events</option>
+              <option value="50">50 Events</option>
+            </select>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Test SIEM Connection</span>
+              <p class="action-desc">Dispatches an authenticated cryptographic heartbeat probe to verify collector reachability, SSL termination, and token authorization.</p>
+            </div>
+            <button id="testSiemBtn" class="btn btn-secondary">Send SIEM Probe</button>
+          </div>
+          <div id="siemTestResultBox" class="audit-verify-alert" style="display: none;"></div>
         </div>
 
         <div class="pane-header" style="margin-top: 36px;">
