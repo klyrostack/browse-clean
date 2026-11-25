@@ -24,6 +24,11 @@ const DEFAULT_SETTINGS = {
   webRtcPolicyMode: 'default_public_interface_only',
   blockPhishingSpoofs: true,
   clipboardDlp: true,
+  siemForwarding: false,
+  siemEndpoint: '',
+  siemAuthHeader: '',
+  siemFormat: 'ecs_json',
+  siemBatchSize: 10,
   whitelistedDomains: [],
   customSelectors: []
 };
@@ -217,6 +222,249 @@ async function verifyAuditLogChain(log) {
   };
 }
 
+// Enterprise SIEM & Syslog Ingestion Pipeline (ECS, CEF, RFC 5424)
+const SIEM_NAME_MAP = {
+  antiTamper: 'Anti-Tamper Prototype Protection',
+  formDlp: 'Form DLP Synthetic Event Shield',
+  webRtc: 'WebRTC Private LAN IP Leak Shield',
+  phishing: 'Phishing Homoglyph Barrier',
+  clipboardDlp: 'Clipboard DLP Watermark Sanitizer',
+  sessionReplay: 'Session Replay Script Neutralized',
+  contentFilter: 'Content Filter Modal Removal',
+  general: 'Security Shield Intervention'
+};
+
+const SIEM_SEVERITY_MAP = {
+  phishing: 9,
+  formDlp: 8,
+  antiTamper: 7,
+  webRtc: 6,
+  clipboardDlp: 5,
+  sessionReplay: 4,
+  contentFilter: 2,
+  general: 3
+};
+
+function formatAsEcs(entry) {
+  const categoryMap = {
+    antiTamper: { category: ['host', 'security'], type: ['tampering', 'denied'], risk: 80, severity: 4 },
+    formDlp: { category: ['data', 'security'], type: ['exfiltration', 'denied'], risk: 90, severity: 5 },
+    webRtc: { category: ['network', 'security'], type: ['connection', 'denied'], risk: 75, severity: 3 },
+    phishing: { category: ['network', 'threat'], type: ['malware', 'denied'], risk: 95, severity: 5 },
+    clipboardDlp: { category: ['data', 'security'], type: ['exfiltration', 'denied'], risk: 70, severity: 3 },
+    sessionReplay: { category: ['data', 'security'], type: ['exfiltration', 'denied'], risk: 65, severity: 3 },
+    contentFilter: { category: ['configuration'], type: ['change'], risk: 20, severity: 1 },
+    general: { category: ['configuration'], type: ['info'], risk: 10, severity: 1 }
+  };
+  const catInfo = categoryMap[entry.category] || categoryMap.general;
+  const manifestVer = (chrome.runtime && chrome.runtime.getManifest) ? chrome.runtime.getManifest().version : '1.1.0';
+
+  return {
+    '@timestamp': entry.timestamp || new Date().toISOString(),
+    ecs: { version: '8.11.0' },
+    event: {
+      id: entry.id || ('evt_' + Math.random().toString(36).substring(2, 10)),
+      sequence: entry.sequence || 0,
+      category: catInfo.category,
+      type: catInfo.type,
+      action: entry.action || 'intervene',
+      outcome: 'success',
+      dataset: 'browseclean.audit',
+      module: 'endpoint_shield',
+      risk_score: catInfo.risk,
+      severity: catInfo.severity
+    },
+    service: {
+      name: 'browseclean',
+      version: manifestVer
+    },
+    host: {
+      name: 'endpoint-client'
+    },
+    url: {
+      domain: entry.domain || '',
+      original: entry.domain ? `https://${entry.domain}` : ''
+    },
+    rule: {
+      name: SIEM_NAME_MAP[entry.category] || 'Endpoint Defense Rule',
+      category: entry.category || 'general'
+    },
+    message: entry.details || `BrowseClean intervention: ${entry.action} on ${entry.domain}`,
+    hash: {
+      sha256: entry.entryHash || ''
+    },
+    labels: {
+      prev_hash: entry.prevHash || '',
+      entry_hash: entry.entryHash || '',
+      extension_id: chrome.runtime.id || 'browseclean'
+    }
+  };
+}
+
+function formatBatchAsEcsNdjson(entries) {
+  if (!Array.isArray(entries)) return '';
+  return entries.map(e => JSON.stringify(formatAsEcs(e))).join('\n');
+}
+
+function formatAsCef(entry) {
+  const version = '0';
+  const vendor = 'BrowseClean';
+  const product = 'EndpointShield';
+  const devVersion = (chrome.runtime && chrome.runtime.getManifest) ? chrome.runtime.getManifest().version : '1.1.0';
+  const classId = entry.category || 'general';
+  const eventName = SIEM_NAME_MAP[entry.category] || 'Security Intervention';
+  const severity = SIEM_SEVERITY_MAP[entry.category] || 3;
+
+  const escapeHeader = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+  const escapeExt = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/=/g, '\\=').replace(/\r?\n/g, '\\n');
+
+  const rt = entry.timestamp ? new Date(entry.timestamp).getTime() : Date.now();
+  const dhost = entry.domain ? escapeExt(entry.domain) : 'unknown';
+  const act = entry.action ? escapeExt(entry.action) : 'intervene';
+  const msg = entry.details ? escapeExt(entry.details) : 'Security shield intervention';
+  const cn1 = typeof entry.sequence === 'number' ? entry.sequence : 0;
+  const cs1 = entry.prevHash ? escapeExt(entry.prevHash) : '';
+  const cs2 = entry.entryHash ? escapeExt(entry.entryHash) : '';
+  const extId = entry.id ? escapeExt(entry.id) : '';
+
+  const extension = `rt=${rt} dhost=${dhost} act=${act} cat=${classId} msg=${msg} cn1=${cn1} cn1Label=SequenceId cs1=${cs1} cs1Label=PrevHash cs2=${cs2} cs2Label=EntryHash externalId=${extId}`;
+
+  return `CEF:${version}|${escapeHeader(vendor)}|${escapeHeader(product)}|${escapeHeader(devVersion)}|${escapeHeader(classId)}|${escapeHeader(eventName)}|${severity}|${extension}`;
+}
+
+function formatBatchAsCef(entries) {
+  if (!Array.isArray(entries)) return '';
+  return entries.map(formatAsCef).join('\n');
+}
+
+function formatAsRfc5424(entry) {
+  const priMap = {
+    phishing: 83,      // authpriv (10) * 8 + Error (3)
+    formDlp: 83,       // authpriv (10) * 8 + Error (3)
+    antiTamper: 84,    // authpriv (10) * 8 + Warning (4)
+    webRtc: 84,        // authpriv (10) * 8 + Warning (4)
+    clipboardDlp: 85,  // authpriv (10) * 8 + Notice (5)
+    sessionReplay: 85, // authpriv (10) * 8 + Notice (5)
+    contentFilter: 86  // authpriv (10) * 8 + Info (6)
+  };
+  const pri = priMap[entry.category] || 86;
+  const version = '1';
+  const timestamp = entry.timestamp ? new Date(entry.timestamp).toISOString() : new Date().toISOString();
+  const hostname = 'endpoint.browser';
+  const appName = 'BrowseClean';
+  const procId = 'shield';
+  const msgId = `SEC-${(entry.category || 'EVENT').toUpperCase()}`;
+
+  const escapeSd = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\]/g, '\\]');
+
+  const seq = entry.sequence || 0;
+  const domain = escapeSd(entry.domain);
+  const category = escapeSd(entry.category);
+  const action = escapeSd(entry.action);
+  const prevHash = escapeSd(entry.prevHash);
+  const entryHash = escapeSd(entry.entryHash);
+  const eventId = escapeSd(entry.id);
+
+  const sd = `[audit@53288 seq="${seq}" domain="${domain}" category="${category}" action="${action}" id="${eventId}" prevHash="${prevHash}" entryHash="${entryHash}"]`;
+  const msg = entry.details ? ` ${entry.details}` : ` Intervention on ${domain}`;
+
+  return `<${pri}>${version} ${timestamp} ${hostname} ${appName} ${procId} ${msgId} ${sd}${msg}`;
+}
+
+function formatBatchAsRfc5424(entries) {
+  if (!Array.isArray(entries)) return '';
+  return entries.map(formatAsRfc5424).join('\n');
+}
+
+// In-Memory Forwarder Queue & HTTP Pipeline
+let siemBuffer = [];
+let siemFlushTimeout = null;
+const siemStats = {
+  totalDispatched: 0,
+  failedDispatched: 0,
+  lastDispatchTime: null,
+  lastDispatchStatus: 'Idle'
+};
+
+async function dispatchSiemBatch(events, settings) {
+  if (!settings.siemEndpoint || !Array.isArray(events) || events.length === 0) return;
+
+  const format = settings.siemFormat || 'ecs_json';
+  let payloadBody = '';
+  let contentType = 'application/json';
+
+  if (format === 'cef') {
+    payloadBody = formatBatchAsCef(events);
+    contentType = 'text/plain';
+  } else if (format === 'rfc5424') {
+    payloadBody = formatBatchAsRfc5424(events);
+    contentType = 'application/syslog';
+  } else {
+    payloadBody = formatBatchAsEcsNdjson(events);
+    contentType = 'application/x-ndjson';
+  }
+
+  const headers = {
+    'Content-Type': contentType,
+    'X-BrowseClean-Batch-Size': String(events.length),
+    'X-BrowseClean-Audit-Root': (events[0] && events[0].entryHash) ? events[0].entryHash : ''
+  };
+
+  if (settings.siemAuthHeader && settings.siemAuthHeader.trim()) {
+    headers['Authorization'] = settings.siemAuthHeader.trim();
+  }
+
+  try {
+    const response = await fetch(settings.siemEndpoint, {
+      method: 'POST',
+      headers: headers,
+      body: payloadBody
+    });
+
+    if (response.ok) {
+      siemStats.totalDispatched += events.length;
+      siemStats.lastDispatchTime = new Date().toISOString();
+      siemStats.lastDispatchStatus = `Success (HTTP ${response.status}) at ${new Date().toLocaleTimeString()}`;
+    } else {
+      siemStats.failedDispatched += events.length;
+      siemStats.lastDispatchStatus = `Failed (HTTP ${response.status}: ${response.statusText})`;
+      if (siemBuffer.length < 200) {
+        siemBuffer.unshift(...events);
+      }
+    }
+  } catch (err) {
+    siemStats.failedDispatched += events.length;
+    siemStats.lastDispatchStatus = `Network Error: ${err.message || 'Endpoint unreachable'}`;
+    if (siemBuffer.length < 200) {
+      siemBuffer.unshift(...events);
+    }
+  }
+}
+
+function queueSiemEvent(entry, settings) {
+  if (!settings.siemForwarding || !settings.siemEndpoint) return;
+
+  siemBuffer.push(entry);
+  const batchSize = Math.max(1, parseInt(settings.siemBatchSize, 10) || 10);
+
+  if (siemBuffer.length >= batchSize) {
+    const toSend = siemBuffer.splice(0, batchSize);
+    if (siemFlushTimeout) {
+      clearTimeout(siemFlushTimeout);
+      siemFlushTimeout = null;
+    }
+    dispatchSiemBatch(toSend, settings);
+  } else if (!siemFlushTimeout) {
+    siemFlushTimeout = setTimeout(() => {
+      siemFlushTimeout = null;
+      if (siemBuffer.length > 0) {
+        const toSend = siemBuffer.splice(0, siemBuffer.length);
+        dispatchSiemBatch(toSend, settings);
+      }
+    }, 5000);
+  }
+}
+
 // Telemetry, Audit Logging & Badge Synchronization
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getEffectiveSettings') {
@@ -264,6 +512,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         chrome.storage.local.set({ auditLog: log, auditRootHash: entryHash }, () => {
           sendResponse({ recorded: true, count: log.length, rootHash: entryHash });
+          if (settings.siemForwarding) {
+            queueSiemEvent(chainedEntry, settings);
+          }
         });
       });
     });
@@ -366,7 +617,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         'stopAutoplay', 'blockNotifications', 'blockSurveys', 'unblurContent',
         'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
         'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
-        'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp'
+        'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp',
+        'siemForwarding', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'siemBatchSize'
       ];
       const payloadToHash = JSON.stringify({ settings, lockedKeys, isManaged });
       const policyHash = await computeSha256(payloadToHash);
@@ -414,6 +666,132 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         levelOfControl: 'not_controllable'
       });
     }
+    return true;
+  }
+
+  // SIEM Batch Serialization for Air-Gapped Export
+  if (message.action === 'formatAuditLog') {
+    chrome.storage.local.get(['auditLog'], (res) => {
+      const log = res.auditLog || [];
+      const format = message.format || 'ecs_json';
+      let formatted = '';
+      let filename = '';
+      let mimeType = 'text/plain';
+
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+      if (format === 'cef') {
+        formatted = formatBatchAsCef(log);
+        filename = `browseclean-audit-${ts}.cef`;
+        mimeType = 'text/plain';
+      } else if (format === 'rfc5424') {
+        formatted = formatBatchAsRfc5424(log);
+        filename = `browseclean-audit-rfc5424-${ts}.log`;
+        mimeType = 'text/plain';
+      } else {
+        formatted = formatBatchAsEcsNdjson(log);
+        filename = `browseclean-audit-ecs-${ts}.ndjson`;
+        mimeType = 'application/x-ndjson';
+      }
+
+      sendResponse({
+        content: formatted,
+        filename: filename,
+        mimeType: mimeType,
+        count: log.length
+      });
+    });
+    return true;
+  }
+
+  // SIEM Connection & Heartbeat Probe Test
+  if (message.action === 'testSiemConnection') {
+    resolveEffectiveSettings(async (settings) => {
+      const endpoint = message.endpoint || settings.siemEndpoint;
+      const authHeader = (typeof message.authHeader === 'string') ? message.authHeader : settings.siemAuthHeader;
+      const format = message.format || settings.siemFormat || 'ecs_json';
+
+      if (!endpoint || !endpoint.trim()) {
+        sendResponse({ success: false, error: 'SIEM Ingestion Endpoint URL is empty.' });
+        return;
+      }
+
+      const testTimestamp = new Date().toISOString();
+      const testEvent = {
+        sequence: 0,
+        id: 'test_' + Date.now().toString(36),
+        timestamp: testTimestamp,
+        domain: 'browseclean.internal',
+        category: 'general',
+        action: 'siem_heartbeat_test',
+        details: 'BrowseClean enterprise SIEM connectivity probe and cryptographic heartbeat',
+        prevHash: GENESIS_HASH,
+        entryHash: await computeSha256(`0|${testTimestamp}|browseclean.internal|general|siem_heartbeat_test|probe|${GENESIS_HASH}`)
+      };
+
+      let body = '';
+      let ctype = 'application/json';
+      if (format === 'cef') {
+        body = formatAsCef(testEvent);
+        ctype = 'text/plain';
+      } else if (format === 'rfc5424') {
+        body = formatAsRfc5424(testEvent);
+        ctype = 'application/syslog';
+      } else {
+        body = JSON.stringify(formatAsEcs(testEvent));
+        ctype = 'application/json';
+      }
+
+      const headers = {
+        'Content-Type': ctype,
+        'X-BrowseClean-Probe': 'Heartbeat'
+      };
+      if (authHeader && authHeader.trim()) {
+        headers['Authorization'] = authHeader.trim();
+      }
+
+      const startTime = Date.now();
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: headers,
+          body: body
+        });
+        const latency = Date.now() - startTime;
+        sendResponse({
+          success: resp.ok,
+          status: resp.status,
+          statusText: resp.statusText,
+          latencyMs: latency,
+          error: resp.ok ? null : `HTTP ${resp.status}: ${resp.statusText}`
+        });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          status: 0,
+          latencyMs: Date.now() - startTime,
+          error: err.message || 'Failed to connect to SIEM endpoint'
+        });
+      }
+    });
+    return true;
+  }
+
+  // SIEM Live Diagnostics & Buffer Status
+  if (message.action === 'getSiemDiagnostics') {
+    resolveEffectiveSettings((settings, lockedKeys, isManaged) => {
+      sendResponse({
+        forwardingEnabled: !!settings.siemForwarding,
+        endpoint: settings.siemEndpoint || '',
+        format: settings.siemFormat || 'ecs_json',
+        batchSize: settings.siemBatchSize || 10,
+        hasAuthHeader: !!(settings.siemAuthHeader && settings.siemAuthHeader.trim()),
+        bufferedEvents: siemBuffer.length,
+        stats: siemStats,
+        isManaged: isManaged,
+        lockedKeys: lockedKeys || []
+      });
+    });
     return true;
   }
 });
