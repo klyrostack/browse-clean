@@ -103,6 +103,32 @@
       "description": "Enforce bidirectional clipboard sanitization by stripping invisible zero-width tracking watermarks and shielding API keys and credentials.",
       "type": "boolean"
     },
+    "siemForwarding": {
+      "title": "Enable SIEM Forwarding",
+      "description": "Enforce real-time telemetry streaming of cryptographic audit events to an enterprise SIEM endpoint.",
+      "type": "boolean"
+    },
+    "siemEndpoint": {
+      "title": "SIEM Ingestion Endpoint URL",
+      "description": "HTTPS URL for the enterprise SIEM collector (e.g. Splunk HEC or Elastic HTTP endpoint).",
+      "type": "string"
+    },
+    "siemAuthHeader": {
+      "title": "SIEM Authorization Header",
+      "description": "Authorization token or header string (e.g. Splunk <HEC-TOKEN> or Bearer <TOKEN>).",
+      "type": "string"
+    },
+    "siemFormat": {
+      "title": "SIEM Log Format",
+      "description": "Standardized event schema: ecs_json (Elastic Common Schema), cef (Common Event Format), or rfc5424 (Syslog).",
+      "type": "string",
+      "enum": ["ecs_json", "cef", "rfc5424"]
+    },
+    "siemBatchSize": {
+      "title": "SIEM Batch Size",
+      "description": "Number of audit events buffered before dispatching an HTTP POST to the SIEM collector (1-100).",
+      "type": "integer"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
