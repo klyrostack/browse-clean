@@ -45,7 +45,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const auditVerificationAlert = document.getElementById('auditVerificationAlert');
   const exportComplianceJsonBtn = document.getElementById('exportComplianceJsonBtn');
   const exportComplianceCsvBtn = document.getElementById('exportComplianceCsvBtn');
+  const exportEcsBtn = document.getElementById('exportEcsBtn');
+  const exportCefBtn = document.getElementById('exportCefBtn');
+  const exportSyslogBtn = document.getElementById('exportSyslogBtn');
   const clearAuditLogBtn = document.getElementById('clearAuditLogBtn');
+
+  const siemBufferVal = document.getElementById('siemBufferVal');
+  const siemDispatchedVal = document.getElementById('siemDispatchedVal');
+  const siemStatusVal = document.getElementById('siemStatusVal');
+  const optSiemForwarding = document.getElementById('opt-siem-forwarding');
+  const optSiemEndpoint = document.getElementById('opt-siem-endpoint');
+  const optSiemAuth = document.getElementById('opt-siem-auth');
+  const optSiemFormat = document.getElementById('opt-siem-format');
+  const optSiemBatchSize = document.getElementById('opt-siem-batch-size');
+  const testSiemBtn = document.getElementById('testSiemBtn');
+  const siemTestResultBox = document.getElementById('siemTestResultBox');
 
   const enterprisePolicyStatusVal = document.getElementById('enterprisePolicyStatusVal');
   const enterpriseEnforcedKeysVal = document.getElementById('enterpriseEnforcedKeysVal');
@@ -77,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     blockWebRtcLeak: optWebRtc,
     blockPhishingSpoofs: optPhishing,
     clipboardDlp: optClipboardDlp,
+    siemForwarding: optSiemForwarding,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
     blockSurveys: optSurveys
@@ -114,8 +129,14 @@ document.addEventListener('DOMContentLoaded', () => {
     auditLogging: true,
     antiTamperDlp: true,
     blockWebRtcLeak: true,
+    webRtcPolicyMode: 'default_public_interface_only',
     blockPhishingSpoofs: true,
     clipboardDlp: true,
+    siemForwarding: false,
+    siemEndpoint: '',
+    siemAuthHeader: '',
+    siemFormat: 'ecs_json',
+    siemBatchSize: 10,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -163,6 +184,27 @@ document.addEventListener('DOMContentLoaded', () => {
           optWebRtcMode.disabled = true;
         }
       }
+
+      if (optSiemForwarding) {
+        optSiemForwarding.checked = !!currentSettings.siemForwarding;
+        if (lockedKeys.includes('siemForwarding')) optSiemForwarding.disabled = true;
+      }
+      if (optSiemEndpoint) {
+        optSiemEndpoint.value = currentSettings.siemEndpoint || '';
+        if (lockedKeys.includes('siemEndpoint')) optSiemEndpoint.disabled = true;
+      }
+      if (optSiemAuth) {
+        optSiemAuth.value = currentSettings.siemAuthHeader || '';
+        if (lockedKeys.includes('siemAuthHeader')) optSiemAuth.disabled = true;
+      }
+      if (optSiemFormat) {
+        optSiemFormat.value = currentSettings.siemFormat || 'ecs_json';
+        if (lockedKeys.includes('siemFormat')) optSiemFormat.disabled = true;
+      }
+      if (optSiemBatchSize) {
+        optSiemBatchSize.value = String(currentSettings.siemBatchSize || 10);
+        if (lockedKeys.includes('siemBatchSize')) optSiemBatchSize.disabled = true;
+      }
     });
   }
 
@@ -173,6 +215,42 @@ document.addEventListener('DOMContentLoaded', () => {
   if (optWebRtcMode) {
     optWebRtcMode.addEventListener('change', () => {
       currentSettings.webRtcPolicyMode = optWebRtcMode.value;
+      saveSettings();
+    });
+  }
+
+  if (optSiemForwarding) {
+    optSiemForwarding.addEventListener('change', () => {
+      currentSettings.siemForwarding = optSiemForwarding.checked;
+      saveSettings();
+      loadSiemDiagnostics();
+    });
+  }
+
+  if (optSiemEndpoint) {
+    optSiemEndpoint.addEventListener('input', () => {
+      currentSettings.siemEndpoint = optSiemEndpoint.value.trim();
+      saveSettings();
+    });
+  }
+
+  if (optSiemAuth) {
+    optSiemAuth.addEventListener('input', () => {
+      currentSettings.siemAuthHeader = optSiemAuth.value.trim();
+      saveSettings();
+    });
+  }
+
+  if (optSiemFormat) {
+    optSiemFormat.addEventListener('change', () => {
+      currentSettings.siemFormat = optSiemFormat.value;
+      saveSettings();
+    });
+  }
+
+  if (optSiemBatchSize) {
+    optSiemBatchSize.addEventListener('change', () => {
+      currentSettings.siemBatchSize = parseInt(optSiemBatchSize.value, 10) || 10;
       saveSettings();
     });
   }
@@ -460,6 +538,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function triggerDownload(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  if (exportEcsBtn) {
+    exportEcsBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'formatAuditLog', format: 'ecs_json' }, (res) => {
+        if (res && res.content) {
+          triggerDownload(res.content, res.filename, res.mimeType);
+        }
+      });
+    });
+  }
+
+  if (exportCefBtn) {
+    exportCefBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'formatAuditLog', format: 'cef' }, (res) => {
+        if (res && res.content) {
+          triggerDownload(res.content, res.filename, res.mimeType);
+        }
+      });
+    });
+  }
+
+  if (exportSyslogBtn) {
+    exportSyslogBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'formatAuditLog', format: 'rfc5424' }, (res) => {
+        if (res && res.content) {
+          triggerDownload(res.content, res.filename, res.mimeType);
+        }
+      });
+    });
+  }
+
   if (clearAuditLogBtn) {
     clearAuditLogBtn.addEventListener('click', () => {
       if (confirm('Permanently clear all local cryptographic audit records?')) {
@@ -522,7 +642,15 @@ document.addEventListener('DOMContentLoaded', () => {
         regContent += `[HKEY_LOCAL_MACHINE\\Software\\Policies\\Google\\Chrome\\3rdparty\\extensions\\${extId}\\policy]\r\n`;
 
         schemaKeys.forEach(key => {
-          regContent += `"${key}"=dword:00000001\r\n`;
+          if (['webRtcPolicyMode', 'siemEndpoint', 'siemAuthHeader', 'siemFormat'].includes(key)) {
+            const val = (currentSettings[key] !== undefined) ? currentSettings[key] : '';
+            regContent += `"${key}"="${val}"\r\n`;
+          } else if (key === 'siemBatchSize') {
+            const numVal = (parseInt(currentSettings[key], 10) || 10).toString(16).padStart(8, '0');
+            regContent += `"${key}"=dword:${numVal}\r\n`;
+          } else {
+            regContent += `"${key}"=dword:00000001\r\n`;
+          }
         });
 
         const blob = new Blob([regContent], { type: 'text/plain;charset=utf-8' });
@@ -663,8 +791,78 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function loadSiemDiagnostics() {
+    chrome.runtime.sendMessage({ action: 'getSiemDiagnostics' }, (res) => {
+      if (!res) return;
+      if (siemBufferVal) {
+        siemBufferVal.textContent = res.bufferedEvents || 0;
+      }
+      if (siemDispatchedVal) {
+        siemDispatchedVal.textContent = (res.stats && res.stats.totalDispatched !== undefined) ? res.stats.totalDispatched : 0;
+      }
+      if (siemStatusVal) {
+        if (!res.forwardingEnabled) {
+          siemStatusVal.textContent = 'Disabled';
+          siemStatusVal.style.color = '#71717A';
+        } else if (res.stats && res.stats.lastDispatchStatus) {
+          const status = res.stats.lastDispatchStatus;
+          siemStatusVal.textContent = status.startsWith('Success') ? 'Streaming' : status.slice(0, 16);
+          siemStatusVal.style.color = status.startsWith('Success') ? '#34D399' : '#F87171';
+        } else {
+          siemStatusVal.textContent = 'Active (Idle)';
+          siemStatusVal.style.color = '#60A5FA';
+        }
+      }
+    });
+  }
+
+  if (testSiemBtn) {
+    testSiemBtn.addEventListener('click', () => {
+      testSiemBtn.disabled = true;
+      testSiemBtn.textContent = 'Probing SIEM...';
+      if (siemTestResultBox) {
+        siemTestResultBox.style.display = 'block';
+        siemTestResultBox.className = 'audit-verify-alert';
+        siemTestResultBox.textContent = 'Transmitting cryptographic heartbeat probe to SIEM endpoint...';
+      }
+
+      chrome.runtime.sendMessage({
+        action: 'testSiemConnection',
+        endpoint: optSiemEndpoint ? optSiemEndpoint.value.trim() : '',
+        authHeader: optSiemAuth ? optSiemAuth.value.trim() : '',
+        format: optSiemFormat ? optSiemFormat.value : 'ecs_json'
+      }, (res) => {
+        testSiemBtn.disabled = false;
+        testSiemBtn.textContent = 'Send SIEM Probe';
+        if (!siemTestResultBox) return;
+
+        if (res && res.success) {
+          siemTestResultBox.className = 'audit-verify-alert success';
+          siemTestResultBox.innerHTML = `
+            <strong>SIEM Connection Verified:</strong> Successfully delivered cryptographic heartbeat.<br>
+            <span style="font-size: 11px; opacity: 0.9;">
+              Status: <strong>HTTP ${res.status}</strong> |
+              Latency: <strong>${res.latencyMs} ms</strong> |
+              Payload Verified: <strong>Accepted by Ingestion Engine</strong>
+            </span>
+          `;
+        } else {
+          siemTestResultBox.className = 'audit-verify-alert danger';
+          siemTestResultBox.innerHTML = `
+            <strong>SIEM Delivery Failure:</strong> ${res ? (res.error || 'Connection rejected') : 'Endpoint unreachable'}<br>
+            <span style="font-size: 11px; opacity: 0.9;">
+              Ensure the collector endpoint is online, SSL certificates are valid, and authorization tokens match your SIEM profile.
+            </span>
+          `;
+        }
+        loadSiemDiagnostics();
+      });
+    });
+  }
+
   loadSettings();
   loadAuditMetrics();
   loadEnterpriseDiagnostics();
   loadPerformanceDiagnostics();
+  loadSiemDiagnostics();
 });
