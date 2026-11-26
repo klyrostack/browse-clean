@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
   siemAuthHeader: '',
   siemFormat: 'ecs_json',
   siemBatchSize: 10,
+  webAuthnAdminLock: false,
   whitelistedDomains: [],
   customSelectors: []
 };
@@ -231,6 +232,7 @@ const SIEM_NAME_MAP = {
   clipboardDlp: 'Clipboard DLP Watermark Sanitizer',
   sessionReplay: 'Session Replay Script Neutralized',
   contentFilter: 'Content Filter Modal Removal',
+  adminAuth: 'Zero-Trust WebAuthn Admin Authentication',
   general: 'Security Shield Intervention'
 };
 
@@ -238,6 +240,7 @@ const SIEM_SEVERITY_MAP = {
   phishing: 9,
   formDlp: 8,
   antiTamper: 7,
+  adminAuth: 8,
   webRtc: 6,
   clipboardDlp: 5,
   sessionReplay: 4,
@@ -254,6 +257,7 @@ function formatAsEcs(entry) {
     clipboardDlp: { category: ['data', 'security'], type: ['exfiltration', 'denied'], risk: 70, severity: 3 },
     sessionReplay: { category: ['data', 'security'], type: ['exfiltration', 'denied'], risk: 65, severity: 3 },
     contentFilter: { category: ['configuration'], type: ['change'], risk: 20, severity: 1 },
+    adminAuth: { category: ['authentication', 'iam'], type: ['access', 'allowed'], risk: 85, severity: 4 },
     general: { category: ['configuration'], type: ['info'], risk: 10, severity: 1 }
   };
   const catInfo = categoryMap[entry.category] || categoryMap.general;
@@ -341,6 +345,7 @@ function formatAsRfc5424(entry) {
   const priMap = {
     phishing: 83,      // authpriv (10) * 8 + Error (3)
     formDlp: 83,       // authpriv (10) * 8 + Error (3)
+    adminAuth: 83,     // authpriv (10) * 8 + Error (3)
     antiTamper: 84,    // authpriv (10) * 8 + Warning (4)
     webRtc: 84,        // authpriv (10) * 8 + Warning (4)
     clipboardDlp: 85,  // authpriv (10) * 8 + Notice (5)
@@ -618,7 +623,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
         'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
         'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp',
-        'siemForwarding', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'siemBatchSize'
+        'siemForwarding', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'siemBatchSize',
+        'webAuthnAdminLock'
       ];
       const payloadToHash = JSON.stringify({ settings, lockedKeys, isManaged });
       const policyHash = await computeSha256(payloadToHash);
