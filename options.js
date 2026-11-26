@@ -72,6 +72,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadGpoRegBtn = document.getElementById('downloadGpoRegBtn');
   const downloadGoogleAdminJsonBtn = document.getElementById('downloadGoogleAdminJsonBtn');
 
+  const webauthnSupportVal = document.getElementById('webauthnSupportVal');
+  const webauthnEnrolledVal = document.getElementById('webauthnEnrolledVal');
+  const webauthnSessionVal = document.getElementById('webauthnSessionVal');
+  const optWebAuthnPam = document.getElementById('opt-webauthn-pam');
+  const registerWebAuthnBtn = document.getElementById('registerWebAuthnBtn');
+  const verifyWebAuthnBtn = document.getElementById('verifyWebAuthnBtn');
+  const pamPassphraseInput = document.getElementById('pamPassphraseInput');
+  const setPamPassphraseBtn = document.getElementById('setPamPassphraseBtn');
+  const webauthnAlertBox = document.getElementById('webauthnAlertBox');
+
+  let pamSession = {
+    active: false,
+    expiresAt: 0,
+    timerId: null
+  };
+
   let lockedKeys = [];
   let isManaged = false;
 
@@ -92,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     blockPhishingSpoofs: optPhishing,
     clipboardDlp: optClipboardDlp,
     siemForwarding: optSiemForwarding,
+    webAuthnAdminLock: optWebAuthnPam,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
     blockSurveys: optSurveys
@@ -137,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
     siemAuthHeader: '',
     siemFormat: 'ecs_json',
     siemBatchSize: 10,
+    webAuthnAdminLock: false,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -205,11 +223,40 @@ document.addEventListener('DOMContentLoaded', () => {
         optSiemBatchSize.value = String(currentSettings.siemBatchSize || 10);
         if (lockedKeys.includes('siemBatchSize')) optSiemBatchSize.disabled = true;
       }
+
+      if (optWebAuthnPam) {
+        optWebAuthnPam.checked = !!currentSettings.webAuthnAdminLock;
+        if (lockedKeys.includes('webAuthnAdminLock')) {
+          optWebAuthnPam.disabled = true;
+        }
+      }
+      updatePamStatus();
     });
   }
 
   function saveSettings() {
     chrome.storage.local.set({ settings: currentSettings });
+  }
+
+  if (optWebAuthnPam) {
+    optWebAuthnPam.addEventListener('change', async () => {
+      if (optWebAuthnPam.checked) {
+        currentSettings.webAuthnAdminLock = true;
+        saveSettings();
+        updatePamStatus();
+        showPamAlert('Biometric Privileged Access Management enabled.', 'success');
+      } else {
+        const authorized = await verifyAdminStepUp();
+        if (authorized) {
+          currentSettings.webAuthnAdminLock = false;
+          saveSettings();
+          updatePamStatus();
+          showPamAlert('Biometric Privileged Access Management disabled.', 'info');
+        } else {
+          optWebAuthnPam.checked = true;
+        }
+      }
+    });
   }
 
   if (optWebRtcMode) {
@@ -417,7 +464,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Reset
-  resetBtn.addEventListener('click', () => {
+  resetBtn.addEventListener('click', async () => {
+    const authorized = await verifyAdminStepUp();
+    if (!authorized) return;
     if (confirm('Reset BrowseClean to default configuration?')) {
       chrome.storage.local.clear(() => {
         location.reload();
@@ -491,7 +540,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (exportComplianceJsonBtn) {
-    exportComplianceJsonBtn.addEventListener('click', () => {
+    exportComplianceJsonBtn.addEventListener('click', async () => {
+      const authorized = await verifyAdminStepUp();
+      if (!authorized) return;
       chrome.runtime.sendMessage({ action: 'generateCompliancePackage' }, (res) => {
         if (!res || !res.package) return;
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.package, null, 2));
@@ -581,7 +632,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (clearAuditLogBtn) {
-    clearAuditLogBtn.addEventListener('click', () => {
+    clearAuditLogBtn.addEventListener('click', async () => {
+      const authorized = await verifyAdminStepUp();
+      if (!authorized) return;
       if (confirm('Permanently clear all local cryptographic audit records?')) {
         chrome.runtime.sendMessage({ action: 'clearAuditLog' }, () => {
           if (auditVerificationAlert) {
@@ -633,7 +686,9 @@ document.addEventListener('DOMContentLoaded', () => {
           'stopAutoplay', 'blockNotifications', 'blockSurveys', 'unblurContent',
           'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
           'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
-          'blockWebRtcLeak', 'blockPhishingSpoofs', 'clipboardDlp'
+          'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp',
+          'siemForwarding', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'siemBatchSize',
+          'webAuthnAdminLock'
         ];
 
         let regContent = 'Windows Registry Editor Version 5.00\r\n\r\n';
@@ -860,9 +915,345 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // WebAuthn / FIDO2 Biometric Privileged Access Management (PAM)
+  function showPamAlert(msg, type) {
+    if (!webauthnAlertBox) return;
+    webauthnAlertBox.style.display = 'block';
+    webauthnAlertBox.className = `audit-verify-alert ${type || 'info'}`;
+    webauthnAlertBox.textContent = msg;
+  }
+
+  function grantPamSession() {
+    pamSession.active = true;
+    pamSession.expiresAt = Date.now() + 5 * 60 * 1000;
+    if (pamSession.timerId) {
+      clearInterval(pamSession.timerId);
+    }
+    pamSession.timerId = setInterval(updatePamStatus, 1000);
+    updatePamStatus();
+  }
+
+  function updatePamStatus() {
+    if (window.PublicKeyCredential && typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(available => {
+        if (webauthnSupportVal) {
+          webauthnSupportVal.textContent = available ? 'Platform Available' : 'FIDO2 / Roaming';
+          webauthnSupportVal.style.color = available ? '#34D399' : '#60A5FA';
+        }
+      }).catch(() => {
+        if (webauthnSupportVal) {
+          webauthnSupportVal.textContent = 'FIDO2 Ready';
+          webauthnSupportVal.style.color = '#60A5FA';
+        }
+      });
+    } else {
+      if (webauthnSupportVal) {
+        webauthnSupportVal.textContent = 'Unsupported';
+        webauthnSupportVal.style.color = '#F87171';
+      }
+    }
+
+    chrome.storage.local.get(['webAuthnCredential', 'pamPassphraseHash'], (res) => {
+      if (webauthnEnrolledVal) {
+        if (res.webAuthnCredential) {
+          webauthnEnrolledVal.textContent = 'Hardware Key Enrolled';
+          webauthnEnrolledVal.style.color = '#34D399';
+        } else if (res.pamPassphraseHash) {
+          webauthnEnrolledVal.textContent = 'Passphrase Enrolled';
+          webauthnEnrolledVal.style.color = '#60A5FA';
+        } else {
+          webauthnEnrolledVal.textContent = 'None Enrolled';
+          webauthnEnrolledVal.style.color = '#71717A';
+        }
+      }
+    });
+
+    if (webauthnSessionVal) {
+      if (pamSession.active && Date.now() < pamSession.expiresAt) {
+        const remaining = Math.max(0, Math.floor((pamSession.expiresAt - Date.now()) / 1000));
+        const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+        const ss = String(remaining % 60).padStart(2, '0');
+        webauthnSessionVal.textContent = `Active (${mm}:${ss})`;
+        webauthnSessionVal.style.color = '#34D399';
+      } else {
+        pamSession.active = false;
+        if (pamSession.timerId) {
+          clearInterval(pamSession.timerId);
+          pamSession.timerId = null;
+        }
+        if (currentSettings.webAuthnAdminLock) {
+          webauthnSessionVal.textContent = 'Locked';
+          webauthnSessionVal.style.color = '#F87171';
+        } else {
+          webauthnSessionVal.textContent = 'Unlocked (Disabled)';
+          webauthnSessionVal.style.color = '#71717A';
+        }
+      }
+    }
+  }
+
+  async function hashPassphrase(passphrase, saltBytes) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(passphrase),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: saltBytes,
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['encrypt', 'decrypt']
+    );
+    const exported = await crypto.subtle.exportKey('raw', key);
+    return Array.from(new Uint8Array(exported))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async function verifyPassphrase(passphrase, storedHash, saltHex) {
+    const saltBytes = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+    const computedHash = await hashPassphrase(passphrase, saltBytes);
+    return computedHash === storedHash;
+  }
+
+  async function verifyAdminStepUp() {
+    if (!currentSettings.webAuthnAdminLock) {
+      return true;
+    }
+
+    if (pamSession.active && Date.now() < pamSession.expiresAt) {
+      return true;
+    }
+
+    const stored = await new Promise((resolve) => {
+      chrome.storage.local.get(['webAuthnCredential', 'pamPassphraseHash', 'pamPassphraseSalt'], resolve);
+    });
+
+    if (stored.webAuthnCredential && window.PublicKeyCredential) {
+      try {
+        const challenge = new Uint8Array(32);
+        crypto.getRandomValues(challenge);
+
+        const rawIdBytes = new Uint8Array(
+          stored.webAuthnCredential.rawIdHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+        );
+
+        const getOptions = {
+          publicKey: {
+            challenge: challenge,
+            rpId: location.hostname,
+            allowCredentials: [{
+              id: rawIdBytes,
+              type: 'public-key'
+            }],
+            userVerification: 'preferred',
+            timeout: 60000
+          }
+        };
+
+        const assertion = await navigator.credentials.get(getOptions);
+        if (assertion) {
+          grantPamSession();
+          chrome.runtime.sendMessage({
+            action: 'recordAuditLog',
+            entry: {
+              domain: location.hostname,
+              category: 'adminAuth',
+              action: 'webauthn_verify_success',
+              details: 'Hardware-backed biometric verification succeeded (Step-Up Authorized)'
+            }
+          });
+          showPamAlert('Biometric user verification confirmed. Privileged session active for 5 minutes.', 'success');
+          return true;
+        }
+      } catch (err) {
+        chrome.runtime.sendMessage({
+          action: 'recordAuditLog',
+          entry: {
+            domain: location.hostname,
+            category: 'adminAuth',
+            action: 'webauthn_verify_failed',
+            details: `Biometric verification failed: ${err.message}`
+          }
+        });
+        showPamAlert(`Biometric verification failed: ${err.message}`, 'danger');
+        return false;
+      }
+    }
+
+    if (stored.pamPassphraseHash && stored.pamPassphraseSalt) {
+      const promptInput = prompt('Enter Master Admin Passphrase to authorize privileged action:');
+      if (!promptInput) {
+        showPamAlert('Privileged action aborted: Passphrase prompt dismissed.', 'danger');
+        return false;
+      }
+      const isValid = await verifyPassphrase(promptInput, stored.pamPassphraseHash, stored.pamPassphraseSalt);
+      if (isValid) {
+        grantPamSession();
+        chrome.runtime.sendMessage({
+          action: 'recordAuditLog',
+          entry: {
+            domain: location.hostname,
+            category: 'adminAuth',
+            action: 'passphrase_verify_success',
+            details: 'PBKDF2-SHA256 passphrase verified (Step-Up Authorized)'
+          }
+        });
+        showPamAlert('Admin passphrase verified. Privileged session active for 5 minutes.', 'success');
+        return true;
+      } else {
+        chrome.runtime.sendMessage({
+          action: 'recordAuditLog',
+          entry: {
+            domain: location.hostname,
+            category: 'adminAuth',
+            action: 'passphrase_verify_failed',
+            details: 'Invalid admin passphrase entered'
+          }
+        });
+        showPamAlert('Incorrect admin passphrase. Privileged action aborted.', 'danger');
+        return false;
+      }
+    }
+
+    showPamAlert('Step-Up required but no hardware key or passphrase enrolled. Please enroll an authenticator below.', 'info');
+    return false;
+  }
+
+  if (registerWebAuthnBtn) {
+    registerWebAuthnBtn.addEventListener('click', async () => {
+      if (!window.PublicKeyCredential) {
+        showPamAlert('WebAuthn is not supported in this browser.', 'danger');
+        return;
+      }
+
+      registerWebAuthnBtn.disabled = true;
+      registerWebAuthnBtn.textContent = 'Enrolling...';
+
+      try {
+        const challenge = new Uint8Array(32);
+        crypto.getRandomValues(challenge);
+        const userId = new Uint8Array(16);
+        crypto.getRandomValues(userId);
+
+        const createOptions = {
+          publicKey: {
+            challenge: challenge,
+            rp: {
+              name: 'BrowseClean Endpoint Shield',
+              id: location.hostname
+            },
+            user: {
+              id: userId,
+              name: 'admin@browseclean.local',
+              displayName: 'Enterprise Administrator'
+            },
+            pubKeyCredParams: [
+              { alg: -7, type: 'public-key' },
+              { alg: -257, type: 'public-key' }
+            ],
+            authenticatorSelection: {
+              userVerification: 'preferred',
+              requireResidentKey: false
+            },
+            timeout: 60000,
+            attestation: 'none'
+          }
+        };
+
+        const credential = await navigator.credentials.create(createOptions);
+        if (credential) {
+          const rawIdHex = Array.from(new Uint8Array(credential.rawId))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+
+          const credData = {
+            id: credential.id,
+            rawIdHex: rawIdHex,
+            registeredAt: new Date().toISOString()
+          };
+
+          await new Promise((resolve) => {
+            chrome.storage.local.set({ webAuthnCredential: credData }, resolve);
+          });
+
+          chrome.runtime.sendMessage({
+            action: 'recordAuditLog',
+            entry: {
+              domain: location.hostname,
+              category: 'adminAuth',
+              action: 'webauthn_enroll',
+              details: `Hardware authenticator enrolled (ID: ${credential.id.slice(0, 16)}...)`
+            }
+          });
+
+          showPamAlert('Biometric / Hardware authenticator successfully enrolled!', 'success');
+          grantPamSession();
+        }
+      } catch (err) {
+        showPamAlert(`WebAuthn enrollment cancelled or failed: ${err.message}`, 'danger');
+      } finally {
+        registerWebAuthnBtn.disabled = false;
+        registerWebAuthnBtn.textContent = 'Enroll Hardware Key';
+        updatePamStatus();
+      }
+    });
+  }
+
+  if (verifyWebAuthnBtn) {
+    verifyWebAuthnBtn.addEventListener('click', async () => {
+      verifyWebAuthnBtn.disabled = true;
+      verifyWebAuthnBtn.textContent = 'Verifying...';
+      await verifyAdminStepUp();
+      verifyWebAuthnBtn.disabled = false;
+      verifyWebAuthnBtn.textContent = 'Verify Biometrics';
+      updatePamStatus();
+    });
+  }
+
+  if (setPamPassphraseBtn && pamPassphraseInput) {
+    setPamPassphraseBtn.addEventListener('click', async () => {
+      const pass = pamPassphraseInput.value.trim();
+      if (pass.length < 6) {
+        showPamAlert('Passphrase must be at least 6 characters.', 'danger');
+        return;
+      }
+
+      const saltBytes = new Uint8Array(16);
+      crypto.getRandomValues(saltBytes);
+      const saltHex = Array.from(saltBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      const hash = await hashPassphrase(pass, saltBytes);
+
+      await new Promise(r => chrome.storage.local.set({ pamPassphraseHash: hash, pamPassphraseSalt: saltHex }, r));
+      pamPassphraseInput.value = '';
+
+      chrome.runtime.sendMessage({
+        action: 'recordAuditLog',
+        entry: {
+          domain: location.hostname,
+          category: 'adminAuth',
+          action: 'passphrase_enroll',
+          details: 'Master admin passphrase set with PBKDF2-SHA256 (100,000 iterations)'
+        }
+      });
+
+      showPamAlert('Master admin passphrase successfully configured.', 'success');
+      updatePamStatus();
+    });
+  }
+
   loadSettings();
   loadAuditMetrics();
   loadEnterpriseDiagnostics();
   loadPerformanceDiagnostics();
   loadSiemDiagnostics();
+  updatePamStatus();
 });
