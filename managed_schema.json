@@ -129,6 +129,11 @@
       "description": "Number of audit events buffered before dispatching an HTTP POST to the SIEM collector (1-100).",
       "type": "integer"
     },
+    "webAuthnAdminLock": {
+      "title": "Enforce WebAuthn Admin Step-Up",
+      "description": "Enforce biometric or hardware security key user verification before allowing administrative operations.",
+      "type": "boolean"
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
