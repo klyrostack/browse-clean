@@ -483,3 +483,9 @@ input:checked + .slider:before {
   border-color: rgba(239, 68, 68, 0.3);
   color: #F87171;
 }
+
+.audit-verify-alert.info {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60A5FA;
+}
