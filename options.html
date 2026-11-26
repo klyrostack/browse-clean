@@ -489,6 +489,68 @@
         </div>
 
         <div class="pane-header" style="margin-top: 36px;">
+          <h1>Zero-Trust Privileged Access Management (WebAuthn / FIDO2)</h1>
+          <p class="subtitle">Hardware-backed biometric step-up authentication (Windows Hello, Touch ID, YubiKey) guarding administrative actions against local tampering.</p>
+        </div>
+
+        <div class="card">
+          <div class="audit-status-grid">
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="webauthnSupportVal">Checking...</span>
+              <span class="audit-stat-lbl">Platform Biometrics</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="webauthnEnrolledVal">Not Enrolled</span>
+              <span class="audit-stat-lbl">Hardware Credentials</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="webauthnSessionVal">Locked</span>
+              <span class="audit-stat-lbl">Privileged Session</span>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-meta">
+              <span class="row-title">Enforce Biometric Step-Up for Admin Actions</span>
+              <span class="row-desc">Requires hardware biometric or FIDO2 key verification before resetting preferences, clearing audit ledgers, or changing enterprise security settings.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="opt-webauthn-pam">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Register Biometric / Security Key</span>
+              <p class="action-desc">Binds this browser instance to your platform authenticator (Windows Hello, Touch ID) or external FIDO2 hardware token via the W3C WebAuthn API.</p>
+            </div>
+            <button id="registerWebAuthnBtn" class="btn btn-secondary">Enroll Hardware Key</button>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Authenticate Active Session</span>
+              <p class="action-desc">Requests user verification to unlock administrative operations for a 5-minute ephemeral session window without repeated prompts.</p>
+            </div>
+            <button id="verifyWebAuthnBtn" class="btn btn-secondary">Verify Biometrics</button>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Fallback Master Passphrase</span>
+              <p class="action-desc">Configure or update a local cryptographic passphrase (PBKDF2-SHA256, 100,000 iterations) for devices without biometric hardware.</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input type="password" id="pamPassphraseInput" placeholder="Set admin passphrase" style="background: #18181b; color: #e4e4e7; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 6px 10px; font-size: 12px; width: 180px;">
+              <button id="setPamPassphraseBtn" class="btn btn-secondary">Set Passphrase</button>
+            </div>
+          </div>
+
+          <div id="webauthnAlertBox" class="audit-verify-alert" style="display: none;"></div>
+        </div>
+
+        <div class="pane-header" style="margin-top: 36px;">
           <h1>Chromium Enterprise Policy & Fleet Management</h1>
           <p class="subtitle">Administrative deployment inspection, GPO registry integration, and central schema governance via chrome.storage.managed.</p>
         </div>
