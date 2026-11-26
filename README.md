@@ -205,6 +205,32 @@ BrowseClean bridges client-side endpoint defense with enterprise Security Operat
 
 ---
 
+## Zero-Trust Privileged Access Management (WebAuthn / FIDO2)
+
+To prevent local tampering with administrative configurations, whitelist rules, or the cryptographic audit ledger on shared or unattended workstations, BrowseClean incorporates a hardware-backed Privileged Access Management (PAM) architecture powered by the W3C Web Authentication API (`navigator.credentials`).
+
+### Core PAM Architecture
+
+1. **Hardware-Backed User Verification**:
+   - Binds the administrator's browser instance to platform authenticators (Windows Hello, Touch ID, Face ID) or external roaming security tokens (YubiKey, FIDO2 USB/NFC keys).
+   - Generates asymmetric key pairs via `navigator.credentials.create()` (ES256 / RS256) with zero external server dependencies, storing the credential reference locally.
+
+2. **Ephemeral Session Key Ticketing**:
+   - Intercepts high-risk administrative operations:
+     - Purging local cryptographic audit ledgers
+     - Resetting extension configuration to factory defaults
+     - Exporting raw SOC 2 / ISO 27001 compliance packages
+     - Disabling administrative security shields
+   - Performing a privileged operation requires physical user verification via `navigator.credentials.get()`. Once verified, an in-memory ephemeral session ticket is granted for 5 minutes, eliminating redundant prompts while maintaining strict zero-trust hygiene.
+
+3. **PBKDF2 Cryptographic Fallback**:
+   - For environments or legacy workstations lacking biometric or platform authenticator hardware, BrowseClean provides a master admin passphrase fallback derived using PBKDF2-SHA256 with 100,000 iterations and a cryptographically random 16-byte salt via the native Web Crypto API.
+
+4. **Cryptographic Ledger Auditing**:
+   - All biometric registrations, step-up verifications, failures, and privileged session grants are cryptographically chained and recorded into the SHA-256 audit ledger under the `adminAuth` category and streamed to configured enterprise SIEM collectors.
+
+---
+
 ## License
 
 MIT © 2026 Klyrostack
