@@ -195,6 +195,36 @@
             </div>
           </div>
 
+          <div class="row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <div class="row-meta">
+                <span class="row-title">Declarative Supply-Chain Defense (declarativeNetRequest)</span>
+                <span class="row-desc">Blocks third-party session scrapers, keystroke loggers (Hotjar, FullStory, LogRocket, Clarity), and cryptominers at the Chromium C++ socket layer before network payload reaches the DOM.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-declarative-supply-chain" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-subtle);">
+              <div class="row-meta">
+                <span class="row-title" style="font-size: 13px;">Dynamic CSP Response Hardening</span>
+                <span class="row-desc" style="font-size: 11px;">Appends declarative Content-Security-Policy headers (object-src 'none', base-uri 'self') on all HTTP/HTTPS responses to eliminate malicious plugin and base tag hijacking.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="opt-csp-hardening" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
+              <span style="font-size: 12px; color: var(--text-muted);">CSP Policy Profile:</span>
+              <select id="opt-csp-mode" class="select-input" style="background: #18181b; color: #e4e4e7; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 12px;">
+                <option value="standard">Standard (object-src 'none'; base-uri 'self')</option>
+                <option value="strict">Strict (+ require-trusted-types-for 'script')</option>
+              </select>
+            </div>
+          </div>
+
           <div class="row">
             <div class="row-meta">
               <span class="row-title">Phishing & Homoglyph Spoof Shield</span>
@@ -648,6 +678,37 @@
             <button id="runWebRtcAuditBtn" class="btn btn-secondary">Audit WebRTC Shield</button>
           </div>
           <div id="webrtcAuditResultBox" class="audit-verify-alert" style="display: none;"></div>
+        </div>
+
+        <div class="pane-header" style="margin-top: 36px;">
+          <h1>Declarative Supply-Chain Defense & Dynamic CSP</h1>
+          <p class="subtitle">Chromium C++ socket-layer rule compilation, Magecart skimmer suppression, and dynamic declarative CSP header injection via declarativeNetRequest.</p>
+        </div>
+
+        <div class="card">
+          <div class="audit-status-grid">
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="dnrRuleCountVal" style="color: #34D399;">11 Rules Active</span>
+              <span class="audit-stat-lbl">Dynamic DNR Rules</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="dnrStatusVal">Wire Blocking</span>
+              <span class="audit-stat-lbl">Supply-Chain Shield</span>
+            </div>
+            <div class="audit-stat-box">
+              <span class="audit-stat-val" id="dnrCspModeVal" style="color: #60A5FA;">Standard</span>
+              <span class="audit-stat-lbl">CSP Header Injection</span>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <div>
+              <span class="action-title">Audit Active Declarative Rules</span>
+              <p class="action-desc">Inspect dynamic network wire rules and verify that telemetry skimmers, keystroke loggers, and cryptominers are blocked before reaching JavaScript execution.</p>
+            </div>
+            <button id="auditDnrBtn" class="btn btn-secondary">Audit Dynamic Rules</button>
+          </div>
+          <div id="dnrAuditResultBox" class="audit-verify-alert" style="display: none;"></div>
         </div>
       </section>
     </main>
