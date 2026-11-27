@@ -72,6 +72,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadGpoRegBtn = document.getElementById('downloadGpoRegBtn');
   const downloadGoogleAdminJsonBtn = document.getElementById('downloadGoogleAdminJsonBtn');
 
+  const optDeclarativeSupplyChain = document.getElementById('opt-declarative-supply-chain');
+  const optCspHardening = document.getElementById('opt-csp-hardening');
+  const optCspMode = document.getElementById('opt-csp-mode');
+  const dnrRuleCountVal = document.getElementById('dnrRuleCountVal');
+  const dnrStatusVal = document.getElementById('dnrStatusVal');
+  const dnrCspModeVal = document.getElementById('dnrCspModeVal');
+  const auditDnrBtn = document.getElementById('auditDnrBtn');
+  const dnrAuditResultBox = document.getElementById('dnrAuditResultBox');
+
   const webauthnSupportVal = document.getElementById('webauthnSupportVal');
   const webauthnEnrolledVal = document.getElementById('webauthnEnrolledVal');
   const webauthnSessionVal = document.getElementById('webauthnSessionVal');
@@ -109,6 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
     clipboardDlp: optClipboardDlp,
     siemForwarding: optSiemForwarding,
     webAuthnAdminLock: optWebAuthnPam,
+    declarativeSupplyChain: optDeclarativeSupplyChain,
+    dynamicCspHardening: optCspHardening,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
     blockSurveys: optSurveys
@@ -155,6 +166,9 @@ document.addEventListener('DOMContentLoaded', () => {
     siemFormat: 'ecs_json',
     siemBatchSize: 10,
     webAuthnAdminLock: false,
+    declarativeSupplyChain: true,
+    dynamicCspHardening: true,
+    cspMode: 'standard',
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -230,12 +244,45 @@ document.addEventListener('DOMContentLoaded', () => {
           optWebAuthnPam.disabled = true;
         }
       }
+
+      if (optCspMode && currentSettings.cspMode) {
+        optCspMode.value = currentSettings.cspMode;
+        if (lockedKeys.includes('cspMode')) {
+          optCspMode.disabled = true;
+        }
+      }
+
       updatePamStatus();
+      loadDeclarativeDiagnostics();
     });
   }
 
   function saveSettings() {
     chrome.storage.local.set({ settings: currentSettings });
+  }
+
+  if (optDeclarativeSupplyChain) {
+    optDeclarativeSupplyChain.addEventListener('change', () => {
+      currentSettings.declarativeSupplyChain = optDeclarativeSupplyChain.checked;
+      saveSettings();
+      loadDeclarativeDiagnostics();
+    });
+  }
+
+  if (optCspHardening) {
+    optCspHardening.addEventListener('change', () => {
+      currentSettings.dynamicCspHardening = optCspHardening.checked;
+      saveSettings();
+      loadDeclarativeDiagnostics();
+    });
+  }
+
+  if (optCspMode) {
+    optCspMode.addEventListener('change', () => {
+      currentSettings.cspMode = optCspMode.value;
+      saveSettings();
+      loadDeclarativeDiagnostics();
+    });
   }
 
   if (optWebAuthnPam) {
@@ -697,8 +744,8 @@ document.addEventListener('DOMContentLoaded', () => {
         regContent += `[HKEY_LOCAL_MACHINE\\Software\\Policies\\Google\\Chrome\\3rdparty\\extensions\\${extId}\\policy]\r\n`;
 
         schemaKeys.forEach(key => {
-          if (['webRtcPolicyMode', 'siemEndpoint', 'siemAuthHeader', 'siemFormat'].includes(key)) {
-            const val = (currentSettings[key] !== undefined) ? currentSettings[key] : '';
+          if (['webRtcPolicyMode', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'cspMode'].includes(key)) {
+            const val = (currentSettings[key] !== undefined) ? currentSettings[key] : (key === 'cspMode' ? 'standard' : '');
             regContent += `"${key}"="${val}"\r\n`;
           } else if (key === 'siemBatchSize') {
             const numVal = (parseInt(currentSettings[key], 10) || 10).toString(16).padStart(8, '0');
@@ -727,7 +774,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const schemaKeys = (res && res.schemaKeys) ? res.schemaKeys : [];
         const policyPayload = {};
         schemaKeys.forEach(k => {
-          policyPayload[k] = true;
+          if (k === 'cspMode') {
+            policyPayload[k] = 'standard';
+          } else if (k === 'siemBatchSize') {
+            policyPayload[k] = 10;
+          } else if (['siemEndpoint', 'siemAuthHeader', 'siemFormat', 'webRtcPolicyMode'].includes(k)) {
+            policyPayload[k] = currentSettings[k] || '';
+          } else {
+            policyPayload[k] = true;
+          }
         });
         policyPayload.whitelistedDomains = ['internal.corp', 'jira.company.com'];
         policyPayload.forcedLockedSettings = schemaKeys.slice(0, 10);
@@ -1250,10 +1305,83 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function loadDeclarativeDiagnostics() {
+    chrome.runtime.sendMessage({ action: 'getDeclarativeNetworkDiagnostics' }, (res) => {
+      if (!res) return;
+      if (dnrRuleCountVal) {
+        dnrRuleCountVal.textContent = `${res.activeRuleCount || 0} Rules Active`;
+        dnrRuleCountVal.style.color = (res.activeRuleCount > 0) ? '#34D399' : '#71717A';
+      }
+      if (dnrStatusVal) {
+        if (res.supplyChainBlocked) {
+          dnrStatusVal.textContent = 'Wire Blocking';
+          dnrStatusVal.style.color = '#34D399';
+        } else {
+          dnrStatusVal.textContent = 'Bypassed';
+          dnrStatusVal.style.color = '#71717A';
+        }
+      }
+      if (dnrCspModeVal) {
+        if (res.cspHardened) {
+          dnrCspModeVal.textContent = res.cspMode === 'strict' ? 'Strict CSP' : 'Standard CSP';
+          dnrCspModeVal.style.color = '#60A5FA';
+        } else {
+          dnrCspModeVal.textContent = 'Disabled';
+          dnrCspModeVal.style.color = '#71717A';
+        }
+      }
+    });
+  }
+
+  if (auditDnrBtn) {
+    auditDnrBtn.addEventListener('click', () => {
+      auditDnrBtn.disabled = true;
+      auditDnrBtn.textContent = 'Inspecting DNR Rules...';
+      if (dnrAuditResultBox) {
+        dnrAuditResultBox.style.display = 'block';
+        dnrAuditResultBox.className = 'audit-verify-alert';
+        dnrAuditResultBox.textContent = 'Querying Chromium Declarative Net Request engine for active dynamic rules...';
+      }
+
+      chrome.runtime.sendMessage({ action: 'getDeclarativeNetworkDiagnostics' }, (diag) => {
+        auditDnrBtn.disabled = false;
+        auditDnrBtn.textContent = 'Audit Dynamic Rules';
+        if (!dnrAuditResultBox) return;
+
+        if (diag && diag.supported) {
+          const ruleCount = diag.activeRuleCount || 0;
+          const rules = diag.rules || [];
+          const blockRules = rules.filter(r => r.action && r.action.type === 'block');
+          const headerRules = rules.filter(r => r.action && r.action.type === 'modifyHeaders');
+
+          dnrAuditResultBox.className = 'audit-verify-alert success';
+          dnrAuditResultBox.innerHTML = `
+            <strong>Declarative Net Request Engine Verified:</strong> ${ruleCount} dynamic rules enforced at socket layer.<br>
+            <span style="font-size: 11px; opacity: 0.9;">
+              Supply-Chain Blocking Rules: <strong>${blockRules.length} patterns</strong> |
+              Dynamic CSP Header Rules: <strong>${headerRules.length} active</strong> |
+              Enforcement Profile: <strong>${diag.cspMode}</strong>
+            </span>
+            <div style="margin-top: 8px; font-family: monospace; font-size: 11px; max-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px;">
+              ${rules.map(r => `Rule #${r.id}: ${r.action.type.toUpperCase()} [${r.condition.urlFilter || '*'}]`).join('<br>')}
+            </div>
+          `;
+        } else {
+          dnrAuditResultBox.className = 'audit-verify-alert danger';
+          dnrAuditResultBox.innerHTML = `
+            <strong>DNR Diagnostics Unavailable:</strong> declarativeNetRequest API is not available or unsupported in this browser environment.
+          `;
+        }
+        loadDeclarativeDiagnostics();
+      });
+    });
+  }
+
   loadSettings();
   loadAuditMetrics();
   loadEnterpriseDiagnostics();
   loadPerformanceDiagnostics();
   loadSiemDiagnostics();
+  loadDeclarativeDiagnostics();
   updatePamStatus();
 });
