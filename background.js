@@ -30,6 +30,9 @@ const DEFAULT_SETTINGS = {
   siemFormat: 'ecs_json',
   siemBatchSize: 10,
   webAuthnAdminLock: false,
+  declarativeSupplyChain: true,
+  dynamicCspHardening: true,
+  cspMode: 'standard',
   whitelistedDomains: [],
   customSelectors: []
 };
@@ -56,6 +59,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
   chrome.action.setBadgeBackgroundColor({ color: '#3B82F6' });
   enforceWebRtcPolicy();
+  enforceDeclarativeRules();
 });
 
 // Shortcut commands listener (e.g. Alt+Z for Element Zapper)
@@ -126,8 +130,101 @@ function enforceWebRtcPolicy() {
   });
 }
 
-// Initial WebRTC socket policy verification at worker startup
+// Declarative Supply-Chain Defense & Dynamic CSP Engine (declarativeNetRequest)
+const SUPPLY_CHAIN_BLOCK_PATTERNS = [
+  { id: 2001, pattern: '||hotjar.com^', label: 'Hotjar Session Harvester' },
+  { id: 2002, pattern: '||fullstory.com^', label: 'FullStory DOM Recorder' },
+  { id: 2003, pattern: '||logrocket.com^', label: 'LogRocket Keystroke Logger' },
+  { id: 2004, pattern: '||clarity.ms^', label: 'Microsoft Clarity Tracker' },
+  { id: 2005, pattern: '||mouseflow.com^', label: 'Mouseflow Replay Vector' },
+  { id: 2006, pattern: '||coinhive.com^', label: 'Coinhive Cryptominer' },
+  { id: 2007, pattern: '||web-stat.com^', label: 'Web-Stat Exfiltrator' },
+  { id: 2008, pattern: '||clicktale.net^', label: 'ClickTale DOM Monitor' },
+  { id: 2009, pattern: '||smartlook.com^', label: 'Smartlook Session Tracker' },
+  { id: 2010, pattern: '||inspectlet.com^', label: 'Inspectlet Form Logger' }
+];
+
+const DNR_RULE_IDS = [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2100];
+
+function syncDeclarativeSupplyChainRules(settings, whitelistedDomains) {
+  if (!chrome.declarativeNetRequest || !chrome.declarativeNetRequest.updateDynamicRules) {
+    return;
+  }
+
+  const whitelist = Array.isArray(whitelistedDomains)
+    ? whitelistedDomains.filter(d => typeof d === 'string' && d.trim().length > 0)
+    : [];
+  const newRules = [];
+
+  // 1. Supply-Chain Exfiltration & Skimmer Blocking Rules
+  if (settings.declarativeSupplyChain) {
+    for (const item of SUPPLY_CHAIN_BLOCK_PATTERNS) {
+      const condition = {
+        urlFilter: item.pattern,
+        resourceTypes: ['script', 'xmlhttprequest', 'sub_frame', 'ping', 'other']
+      };
+      if (whitelist.length > 0) {
+        condition.excludedInitiatorDomains = whitelist;
+      }
+      newRules.push({
+        id: item.id,
+        priority: 1,
+        action: { type: 'block' },
+        condition: condition
+      });
+    }
+  }
+
+  // 2. Dynamic CSP Hardening (append object-src 'none'; base-uri 'self')
+  if (settings.dynamicCspHardening) {
+    const cspValue = settings.cspMode === 'strict'
+      ? "object-src 'none'; base-uri 'self'; require-trusted-types-for 'script'"
+      : "object-src 'none'; base-uri 'self'";
+
+    const cspCondition = {
+      urlFilter: '|http*',
+      resourceTypes: ['main_frame', 'sub_frame']
+    };
+    if (whitelist.length > 0) {
+      cspCondition.excludedInitiatorDomains = whitelist;
+    }
+
+    newRules.push({
+      id: 2100,
+      priority: 2,
+      action: {
+        type: 'modifyHeaders',
+        responseHeaders: [
+          {
+            header: 'Content-Security-Policy',
+            operation: 'append',
+            value: cspValue
+          }
+        ]
+      },
+      condition: cspCondition
+    });
+  }
+
+  chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: DNR_RULE_IDS,
+    addRules: newRules
+  }, () => {
+    if (chrome.runtime.lastError) {
+      console.warn('[BrowseClean] declarativeNetRequest updateDynamicRules error:', chrome.runtime.lastError.message);
+    }
+  });
+}
+
+function enforceDeclarativeRules() {
+  resolveEffectiveSettings((effective) => {
+    syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains);
+  });
+}
+
+// Initial WebRTC socket policy & declarative rules verification at worker startup
 enforceWebRtcPolicy();
+enforceDeclarativeRules();
 
 // Listen for dynamic policy updates from enterprise MDM / GPO and local storage
 if (chrome.storage && chrome.storage.onChanged) {
@@ -135,6 +232,7 @@ if (chrome.storage && chrome.storage.onChanged) {
     if (area === 'managed') {
       resolveEffectiveSettings((effective, lockedKeys, isManaged) => {
         syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak, effective.webRtcPolicyMode);
+        syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains);
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach(tab => {
             if (tab && tab.id) {
@@ -151,6 +249,7 @@ if (chrome.storage && chrome.storage.onChanged) {
     } else if (area === 'local' && changes.settings) {
       resolveEffectiveSettings((effective) => {
         syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak, effective.webRtcPolicyMode);
+        syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains);
       });
     }
   });
@@ -233,6 +332,7 @@ const SIEM_NAME_MAP = {
   sessionReplay: 'Session Replay Script Neutralized',
   contentFilter: 'Content Filter Modal Removal',
   adminAuth: 'Zero-Trust WebAuthn Admin Authentication',
+  supplyChain: 'Declarative Supply-Chain Shield',
   general: 'Security Shield Intervention'
 };
 
@@ -241,6 +341,7 @@ const SIEM_SEVERITY_MAP = {
   formDlp: 8,
   antiTamper: 7,
   adminAuth: 8,
+  supplyChain: 7,
   webRtc: 6,
   clipboardDlp: 5,
   sessionReplay: 4,
@@ -258,6 +359,7 @@ function formatAsEcs(entry) {
     sessionReplay: { category: ['data', 'security'], type: ['exfiltration', 'denied'], risk: 65, severity: 3 },
     contentFilter: { category: ['configuration'], type: ['change'], risk: 20, severity: 1 },
     adminAuth: { category: ['authentication', 'iam'], type: ['access', 'allowed'], risk: 85, severity: 4 },
+    supplyChain: { category: ['network', 'security'], type: ['protocol', 'denied'], risk: 80, severity: 4 },
     general: { category: ['configuration'], type: ['info'], risk: 10, severity: 1 }
   };
   const catInfo = categoryMap[entry.category] || categoryMap.general;
@@ -347,6 +449,7 @@ function formatAsRfc5424(entry) {
     formDlp: 83,       // authpriv (10) * 8 + Error (3)
     adminAuth: 83,     // authpriv (10) * 8 + Error (3)
     antiTamper: 84,    // authpriv (10) * 8 + Warning (4)
+    supplyChain: 84,   // authpriv (10) * 8 + Warning (4)
     webRtc: 84,        // authpriv (10) * 8 + Warning (4)
     clipboardDlp: 85,  // authpriv (10) * 8 + Notice (5)
     sessionReplay: 85, // authpriv (10) * 8 + Notice (5)
@@ -624,7 +727,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
         'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp',
         'siemForwarding', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'siemBatchSize',
-        'webAuthnAdminLock'
+        'webAuthnAdminLock', 'declarativeSupplyChain', 'dynamicCspHardening', 'cspMode'
       ];
       const payloadToHash = JSON.stringify({ settings, lockedKeys, isManaged });
       const policyHash = await computeSha256(payloadToHash);
@@ -796,6 +899,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         stats: siemStats,
         isManaged: isManaged,
         lockedKeys: lockedKeys || []
+      });
+    });
+    return true;
+  }
+
+  // Declarative Supply-Chain Defense & Dynamic CSP Diagnostics
+  if (message.action === 'getDeclarativeNetworkDiagnostics') {
+    if (!chrome.declarativeNetRequest || !chrome.declarativeNetRequest.getDynamicRules) {
+      sendResponse({
+        supported: false,
+        activeRuleCount: 0,
+        rules: [],
+        supplyChainBlocked: false,
+        cspHardened: false,
+        cspMode: 'disabled'
+      });
+      return true;
+    }
+
+    chrome.declarativeNetRequest.getDynamicRules((rules) => {
+      resolveEffectiveSettings((settings) => {
+        sendResponse({
+          supported: true,
+          activeRuleCount: rules ? rules.length : 0,
+          rules: rules || [],
+          supplyChainBlocked: !!settings.declarativeSupplyChain,
+          cspHardened: !!settings.dynamicCspHardening,
+          cspMode: settings.cspMode || 'standard'
+        });
       });
     });
     return true;
