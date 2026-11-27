@@ -134,6 +134,22 @@
       "description": "Enforce biometric or hardware security key user verification before allowing administrative operations.",
       "type": "boolean"
     },
+    "declarativeSupplyChain": {
+      "title": "Declarative Supply-Chain Defense",
+      "description": "Enforce socket-level blocking of third-party script skimmers, cryptojackers, and data exfiltration endpoints via declarativeNetRequest.",
+      "type": "boolean"
+    },
+    "dynamicCspHardening": {
+      "title": "Dynamic CSP Hardening",
+      "description": "Enforce strict declarative response headers (object-src none, base-uri self) to neutralize web supply-chain script injections.",
+      "type": "boolean"
+    },
+    "cspMode": {
+      "title": "CSP Enforcement Mode",
+      "description": "Dynamic CSP enforcement profile: standard (defense-in-depth) or strict (trusted types).",
+      "type": "string",
+      "enum": ["standard", "strict"]
+    },
     "whitelistedDomains": {
       "title": "Corporate Whitelisted Domains",
       "description": "List of domains exempt from decluttering (e.g. internal intranets).",
