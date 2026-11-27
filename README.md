@@ -33,6 +33,7 @@ BrowseClean uses a two-phase approach to handle page clutter without layout shif
 * **Bidirectional Clipboard DLP & Watermark Sanitizer**: Scrubs invisible zero-width tracking watermarks from copied text and shields high-risk API keys from clipboard siphoning.
 * **Cryptographic Audit Logging (Native Web Crypto API)**: Maintains an on-device, sequential SHA-256 hash-chained ledger powered by `crypto.subtle.digest('SHA-256')`. Each intervention block binds to the preceding block's hash, enabling client-side mathematical verification of zero tampering or record deletion, exportable as signed JSON and CSV compliance packages.
 * **Pre-Paint Execution & Performance Architecture (Zero-FOUC)**: Declarative CSS injection at document_start paired with CSS layout containment (contain: strict, content-visibility: hidden) and synchronous microtask bootstrapping to eliminate Flash of Unstyled Content (FOUC), layout thrashing, and Cumulative Layout Shift (CLS = 0.00).
+* **Declarative Supply-Chain Defense & Dynamic CSP (declarativeNetRequest)**: C++ socket-level wire blocking of third-party session harvesters (Hotjar, FullStory, LogRocket, Clarity) and cryptominers before network packets reach the renderer, combined with dynamic CSP response header injection (`object-src 'none'`, `base-uri 'self'`) to neutralize supply-chain script injections.
 * **Element Zapper (Alt+Z)**: Interactive click-to-kill tool that permanently removes any element on a website and remembers it.
 * **Scroll Traps**: Clears inline `overflow: hidden`, `position: fixed`, and modal lock classes (`sp-message-open`, `modal-open`, `overflow-hidden`).
 * **Autoplay Media**: Pauses unprompted background video playback.
@@ -49,6 +50,9 @@ BrowseClean requests the minimum permissions required to function locally:
 | `activeTab` | Allows the popup to query the active tab's domain and clean state. |
 | `tabs` | Updates the blocked element counter badge on the extension toolbar icon. |
 | `privacy` | Enforces `chrome.privacy.network.webRTCIPHandlingPolicy` (`default_public_interface_only`) to block internal LAN IP leakage at the browser socket level. |
+| `declarativeNetRequest` | Enforces dynamic socket-level network blocking of third-party session scrapers, cryptojackers, and exfiltrators before network packets reach the renderer, and modifies HTTP response headers for dynamic CSP injection. |
+
+Host permissions (`http://*/*`, `https://*/*`) permit declarative header modification (CSP hardening) and dynamic rule evaluation across web traffic.
 
 The extension contains **zero** network requests (`fetch`, `XMLHttpRequest`, `WebSocket`, or analytics beacons).
 
@@ -107,7 +111,7 @@ BrowseClean natively integrates with `chrome.storage.managed` via [`managed_sche
 
 * `whitelistedDomains`: Array of mandatory corporate intranet domains (e.g. `["corp.internal", "jira.company.com"]`) that are permanently exempt from filtering.
 * `forcedLockedSettings`: Array of configuration keys that end-users are strictly prohibited from toggling.
-* Any standard module key (`blockCookies`, `blockNewsletters`, `blockChats`, `restoreScroll`, `stopAutoplay`, `blockNotifications`, `blockSurveys`, `unblurContent`, `unlockCopy`, `cleanUrls`, `blockAntiAdblock`, `blockLoginWalls`, `reclaimViewport`, `blockSessionSpies`, `auditLogging`, `antiTamperDlp`, `blockWebRtcLeak`, `blockPhishingSpoofs`, `clipboardDlp`) enforced by enterprise policy overrides local user preferences.
+* Any standard module key (`blockCookies`, `blockNewsletters`, `blockChats`, `restoreScroll`, `stopAutoplay`, `blockNotifications`, `blockSurveys`, `unblurContent`, `unlockCopy`, `cleanUrls`, `blockAntiAdblock`, `blockLoginWalls`, `reclaimViewport`, `blockSessionSpies`, `auditLogging`, `antiTamperDlp`, `blockWebRtcLeak`, `blockPhishingSpoofs`, `clipboardDlp`, `declarativeSupplyChain`, `dynamicCspHardening`, `cspMode`) enforced by enterprise policy overrides local user preferences.
 
 ### Deployment Channels
 
@@ -228,6 +232,41 @@ To prevent local tampering with administrative configurations, whitelist rules, 
 
 4. **Cryptographic Ledger Auditing**:
    - All biometric registrations, step-up verifications, failures, and privileged session grants are cryptographically chained and recorded into the SHA-256 audit ledger under the `adminAuth` category and streamed to configured enterprise SIEM collectors.
+
+---
+
+## Declarative Supply-Chain Defense & Dynamic CSP Hardening (declarativeNetRequest)
+
+Client-side DOM manipulation scripts run inside the webpage JavaScript execution context. Even when stubs and prototype freezes are applied, advanced client-side supply-chain attacks (such as Magecart skimmers, compromised npm dependencies, and polyfill supply-chain attacks) may execute before or in parallel with user scripts.
+
+BrowseClean implements **Declarative Supply-Chain Defense & Dynamic CSP Hardening** directly at the Chromium C++ socket layer via the Manifest V3 `declarativeNetRequest` API:
+
+### Core Architecture & Mechanics
+
+1. **Chromium Socket-Level Wire Blocking (`declarativeNetRequest.updateDynamicRules`)**:
+   - Compiles known data exfiltration endpoints, session recording beacons, and cryptominers into optimized Chromium C++ internal rule structures:
+     - Hotjar (`||hotjar.com^`)
+     - FullStory (`||fullstory.com^`)
+     - LogRocket (`||logrocket.com^`)
+     - Microsoft Clarity (`||clarity.ms^`)
+     - Mouseflow (`||mouseflow.com^`)
+     - Coinhive (`||coinhive.com^`)
+     - Web-Stat (`||web-stat.com^`)
+     - ClickTale (`||clicktale.net^`)
+     - Smartlook (`||smartlook.com^`)
+     - Inspectlet (`||inspectlet.com^`)
+   - Blocks network traffic across all resource types (`script`, `xmlhttprequest`, `sub_frame`, `ping`, `other`) directly at the socket level. Network payloads are aborted before bytes ever enter the renderer process or execute in V8.
+   - Respects enterprise whitelists through dynamic `excludedInitiatorDomains`.
+
+2. **Dynamic Content-Security-Policy (CSP) Header Hardening (`modifyHeaders`)**:
+   - Injects declarative `Content-Security-Policy` response headers across HTTP and HTTPS web navigation responses via `modifyHeaders`:
+     - **Standard Mode**: Appends `object-src 'none'; base-uri 'self'`, instantly neutralizing legacy Flash/plugin exploits and `<base>` tag hijacking attacks across any website.
+     - **Strict Mode**: Appends `object-src 'none'; base-uri 'self'; require-trusted-types-for 'script'`, enforcing W3C Trusted Types to prevent DOM-based Cross-Site Scripting (XSS).
+   - Complies with W3C CSP Level 3 additive header evaluation: browsers enforce the intersection of all declared policies, guaranteeing that defense-in-depth is applied without stripping or breaking the target website's existing CSP.
+
+3. **Live Rules Auditor & Enterprise Governance**:
+   - The Options dashboard provides a real-time inspection panel querying `chrome.declarativeNetRequest.getDynamicRules()` to verify active socket rules and CSP status on demand.
+   - All supply chain and CSP settings are fully integrated into `managed_schema.json`, GPO `.reg` generators, Google Admin MDM payloads, and the cryptographic SIEM audit pipeline under the `supplyChain` category.
 
 ---
 
