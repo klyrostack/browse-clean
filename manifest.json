@@ -8,7 +8,12 @@
     "storage",
     "activeTab",
     "tabs",
-    "privacy"
+    "privacy",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
   ],
   "action": {
     "default_popup": "popup.html",
