@@ -146,7 +146,9 @@ const SUPPLY_CHAIN_BLOCK_PATTERNS = [
 
 const DNR_RULE_IDS = [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2100];
 
-function syncDeclarativeSupplyChainRules(settings, whitelistedDomains) {
+let lastDnrPolicySignature = null;
+
+function syncDeclarativeSupplyChainRules(settings, whitelistedDomains, logPolicyChange) {
   if (!chrome.declarativeNetRequest || !chrome.declarativeNetRequest.updateDynamicRules) {
     return;
   }
@@ -154,6 +156,15 @@ function syncDeclarativeSupplyChainRules(settings, whitelistedDomains) {
   const whitelist = Array.isArray(whitelistedDomains)
     ? whitelistedDomains.filter(d => typeof d === 'string' && d.trim().length > 0)
     : [];
+  const signature = JSON.stringify({
+    supplyChain: !!settings.declarativeSupplyChain,
+    csp: !!settings.dynamicCspHardening,
+    cspMode: settings.cspMode || 'standard',
+    whitelist: whitelist.slice().sort()
+  });
+  const rulesChanged = lastDnrPolicySignature !== null && lastDnrPolicySignature !== signature;
+  lastDnrPolicySignature = signature;
+
   const newRules = [];
 
   // 1. Supply-Chain Exfiltration & Skimmer Blocking Rules
@@ -212,13 +223,41 @@ function syncDeclarativeSupplyChainRules(settings, whitelistedDomains) {
   }, () => {
     if (chrome.runtime.lastError) {
       console.warn('[BrowseClean] declarativeNetRequest updateDynamicRules error:', chrome.runtime.lastError.message);
+      return;
+    }
+
+    if (logPolicyChange && rulesChanged) {
+      appendAuditLogEntry({
+        domain: 'declarativeNetRequest',
+        category: 'supplyChain',
+        action: 'dnr_rules_synchronized',
+        details: `Synced ${newRules.length} DNR rules (SupplyChain=${!!settings.declarativeSupplyChain}, CSP=${settings.dynamicCspHardening ? (settings.cspMode || 'standard') : 'off'})`
+      });
     }
   });
 }
 
 function enforceDeclarativeRules() {
   resolveEffectiveSettings((effective) => {
-    syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains);
+    syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains, false);
+  });
+}
+
+// Optional debug hook in unpacked/developer builds to audit matched DNR wire blocks
+if (chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDebug) {
+  chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
+    if (!info || !info.rule || !DNR_RULE_IDS.includes(info.rule.ruleId)) return;
+    let host = 'network';
+    try {
+      host = new URL(info.request && info.request.url ? info.request.url : '').hostname || 'network';
+    } catch (e) {}
+    const matched = SUPPLY_CHAIN_BLOCK_PATTERNS.find(p => p.id === info.rule.ruleId);
+    appendAuditLogEntry({
+      domain: host,
+      category: 'supplyChain',
+      action: info.rule.ruleId === 2100 ? 'csp_header_enforced' : 'wire_request_blocked',
+      details: matched ? `Blocked ${matched.label} (${matched.pattern})` : `DNR rule #${info.rule.ruleId} enforced`
+    });
   });
 }
 
@@ -232,7 +271,7 @@ if (chrome.storage && chrome.storage.onChanged) {
     if (area === 'managed') {
       resolveEffectiveSettings((effective, lockedKeys, isManaged) => {
         syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak, effective.webRtcPolicyMode);
-        syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains);
+        syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains, true);
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach(tab => {
             if (tab && tab.id) {
@@ -249,7 +288,7 @@ if (chrome.storage && chrome.storage.onChanged) {
     } else if (area === 'local' && changes.settings) {
       resolveEffectiveSettings((effective) => {
         syncWebRtcHandlingPolicy(!!effective.blockWebRtcLeak, effective.webRtcPolicyMode);
-        syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains);
+        syncDeclarativeSupplyChainRules(effective, effective.whitelistedDomains, true);
       });
     }
   });
@@ -323,6 +362,34 @@ async function verifyAuditLogChain(log) {
 }
 
 // Enterprise SIEM & Syslog Ingestion Pipeline (ECS, CEF, RFC 5424)
+const SIEM_CATEGORY_ALIASES = {
+  'session-spy': 'sessionReplay',
+  'clipboard-dlp': 'clipboardDlp',
+  'webrtc-shield': 'webRtc',
+  'dlp-shield': 'formDlp',
+  'anti-tamper': 'antiTamper',
+  'security': 'phishing',
+  'supply-chain': 'supplyChain',
+  'cookie-wall': 'contentFilter',
+  'cookie-cmp': 'contentFilter',
+  'chat': 'contentFilter',
+  'survey': 'contentFilter',
+  'promo': 'contentFilter',
+  'newsletter-modal': 'contentFilter',
+  'notification-prompt': 'contentFilter',
+  'paywall-blur': 'contentFilter',
+  'anti-adblock': 'contentFilter',
+  'login-wall': 'contentFilter',
+  'url-tracker': 'contentFilter',
+  'veil': 'contentFilter',
+  'backdrop': 'contentFilter',
+  'element': 'contentFilter'
+};
+
+function normalizeSiemCategory(category) {
+  return SIEM_CATEGORY_ALIASES[category] || category || 'general';
+}
+
 const SIEM_NAME_MAP = {
   antiTamper: 'Anti-Tamper Prototype Protection',
   formDlp: 'Form DLP Synthetic Event Shield',
@@ -362,7 +429,8 @@ function formatAsEcs(entry) {
     supplyChain: { category: ['network', 'security'], type: ['protocol', 'denied'], risk: 80, severity: 4 },
     general: { category: ['configuration'], type: ['info'], risk: 10, severity: 1 }
   };
-  const catInfo = categoryMap[entry.category] || categoryMap.general;
+  const normCat = normalizeSiemCategory(entry.category);
+  const catInfo = categoryMap[normCat] || categoryMap.general;
   const manifestVer = (chrome.runtime && chrome.runtime.getManifest) ? chrome.runtime.getManifest().version : '1.1.0';
 
   return {
@@ -392,8 +460,8 @@ function formatAsEcs(entry) {
       original: entry.domain ? `https://${entry.domain}` : ''
     },
     rule: {
-      name: SIEM_NAME_MAP[entry.category] || 'Endpoint Defense Rule',
-      category: entry.category || 'general'
+      name: SIEM_NAME_MAP[normCat] || 'Endpoint Defense Rule',
+      category: normCat
     },
     message: entry.details || `BrowseClean intervention: ${entry.action} on ${entry.domain}`,
     hash: {
@@ -417,9 +485,9 @@ function formatAsCef(entry) {
   const vendor = 'BrowseClean';
   const product = 'EndpointShield';
   const devVersion = (chrome.runtime && chrome.runtime.getManifest) ? chrome.runtime.getManifest().version : '1.1.0';
-  const classId = entry.category || 'general';
-  const eventName = SIEM_NAME_MAP[entry.category] || 'Security Intervention';
-  const severity = SIEM_SEVERITY_MAP[entry.category] || 3;
+  const classId = normalizeSiemCategory(entry.category);
+  const eventName = SIEM_NAME_MAP[classId] || 'Security Intervention';
+  const severity = SIEM_SEVERITY_MAP[classId] || 3;
 
   const escapeHeader = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
   const escapeExt = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/=/g, '\\=').replace(/\r?\n/g, '\\n');
@@ -455,19 +523,20 @@ function formatAsRfc5424(entry) {
     sessionReplay: 85, // authpriv (10) * 8 + Notice (5)
     contentFilter: 86  // authpriv (10) * 8 + Info (6)
   };
-  const pri = priMap[entry.category] || 86;
+  const normCat = normalizeSiemCategory(entry.category);
+  const pri = priMap[normCat] || 86;
   const version = '1';
   const timestamp = entry.timestamp ? new Date(entry.timestamp).toISOString() : new Date().toISOString();
   const hostname = 'endpoint.browser';
   const appName = 'BrowseClean';
   const procId = 'shield';
-  const msgId = `SEC-${(entry.category || 'EVENT').toUpperCase()}`;
+  const msgId = `SEC-${normCat.toUpperCase()}`;
 
   const escapeSd = (str) => String(str || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\]/g, '\\]');
 
   const seq = entry.sequence || 0;
   const domain = escapeSd(entry.domain);
-  const category = escapeSd(entry.category);
+  const category = escapeSd(normCat);
   const action = escapeSd(entry.action);
   const prevHash = escapeSd(entry.prevHash);
   const entryHash = escapeSd(entry.entryHash);
@@ -573,20 +642,17 @@ function queueSiemEvent(entry, settings) {
   }
 }
 
-// Telemetry, Audit Logging & Badge Synchronization
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'getEffectiveSettings') {
-    resolveEffectiveSettings((settings, lockedKeys, isManaged) => {
-      sendResponse({ settings, lockedKeys, isManaged });
-    });
-    return true;
-  }
+let auditWriteQueue = Promise.resolve();
 
-  // Cryptographic Audit Logging (Compliance & DLP)
-  if (message.action === 'recordAuditLog') {
+/**
+ * Appends a tamper-evident entry to the local SHA-256 hash-chained audit ledger.
+ */
+function appendAuditLogEntry(entry, callback) {
+  auditWriteQueue = auditWriteQueue.then(() => new Promise((resolve) => {
     resolveEffectiveSettings((settings) => {
       if (!settings.auditLogging) {
-        sendResponse({ ignored: true });
+        if (callback) callback({ ignored: true });
+        resolve();
         return;
       }
       chrome.storage.local.get(['auditLog'], async (res) => {
@@ -594,10 +660,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const prevHash = (log.length > 0 && log[0].entryHash) ? log[0].entryHash : GENESIS_HASH;
         const sequence = (log.length > 0 && typeof log[0].sequence === 'number') ? log[0].sequence + 1 : (log.length + 1);
         const timestamp = new Date().toISOString();
-        const domain = (message.entry && message.entry.domain) ? message.entry.domain : '';
-        const category = (message.entry && message.entry.category) ? message.entry.category : 'general';
-        const action = (message.entry && message.entry.action) ? message.entry.action : 'intervene';
-        const details = (message.entry && message.entry.details) ? message.entry.details : '';
+        const domain = (entry && entry.domain) ? entry.domain : '';
+        const category = (entry && entry.category) ? entry.category : 'general';
+        const action = (entry && entry.action) ? entry.action : 'intervene';
+        const details = (entry && entry.details) ? entry.details : '';
 
         const payload = `${sequence}|${timestamp}|${domain}|${category}|${action}|${details}|${prevHash}`;
         const entryHash = await computeSha256(payload);
@@ -619,13 +685,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           log = log.slice(0, 1000);
         }
         chrome.storage.local.set({ auditLog: log, auditRootHash: entryHash }, () => {
-          sendResponse({ recorded: true, count: log.length, rootHash: entryHash });
+          if (callback) callback({ recorded: true, count: log.length, rootHash: entryHash });
           if (settings.siemForwarding) {
             queueSiemEvent(chainedEntry, settings);
           }
+          resolve();
         });
       });
     });
+  })).catch(() => {});
+}
+
+// Telemetry, Audit Logging & Badge Synchronization
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'getEffectiveSettings') {
+    resolveEffectiveSettings((settings, lockedKeys, isManaged) => {
+      sendResponse({ settings, lockedKeys, isManaged });
+    });
+    return true;
+  }
+
+  // Cryptographic Audit Logging (Compliance & DLP)
+  if (message.action === 'recordAuditLog') {
+    appendAuditLogEntry(message.entry, sendResponse);
     return true;
   }
 
