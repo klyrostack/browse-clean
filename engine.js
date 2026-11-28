@@ -182,6 +182,18 @@
     'div[id*="qualpro" i]'
   ];
 
+  // Push Notification Prompt Selectors
+  const NOTIFICATION_CONTAINERS = [
+    '#onesignal-slidedown-container',
+    '.onesignal-slidedown-container',
+    '#onesignal-bell-container',
+    '.onesignal-bell-container',
+    '.webpush-prompt',
+    'div[id*="push-notification" i]',
+    'div[class*="notification-prompt" i]',
+    'div[class*="push-prompt" i]'
+  ];
+
   // Anti-adblock container selectors
   const ANTI_ADBLOCK_SELECTORS = [
     '#admiral-root',
@@ -456,6 +468,38 @@
         matches.forEach(el => eradicateElement(el, 'survey'));
       } catch (e) {}
     });
+  }
+
+  /**
+   * 3b. Push Notification Prompts
+   */
+  function sweepNotificationPrompts() {
+    if (!config.blockNotifications) return;
+    NOTIFICATION_CONTAINERS.forEach(selector => {
+      try {
+        const matches = document.querySelectorAll(selector);
+        matches.forEach(el => eradicateElement(el, 'notification-prompt'));
+      } catch (e) {}
+    });
+
+    try {
+      const dialogs = document.querySelectorAll('div[role="dialog"], div[role="alertdialog"], div[class*="notification" i], div[class*="push" i]');
+      dialogs.forEach(el => {
+        if (el.dataset.bcScrubbed) return;
+        const style = window.getComputedStyle(el);
+        if (style.position !== 'fixed' && style.position !== 'sticky') return;
+        if ((parseInt(style.zIndex, 10) || 0) <= 50) return;
+        const txt = (el.innerText || '').toLowerCase();
+        if (
+          txt.includes('allow notifications') ||
+          txt.includes('enable notifications') ||
+          txt.includes('turn on notifications') ||
+          txt.includes('send you notifications')
+        ) {
+          eradicateElement(el, 'notification-prompt');
+        }
+      });
+    } catch (e) {}
   }
 
   /**
@@ -1790,6 +1834,7 @@
     sweepCookieWalls();
     sweepChatWidgets();
     sweepSurveys();
+    sweepNotificationPrompts();
     sweepNewsletterModals();
     sweepPaywallBlurs();
     sweepAntiAdblockWalls();
