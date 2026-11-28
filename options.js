@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const optScroll = document.getElementById('opt-scroll');
   const optAutoplay = document.getElementById('opt-autoplay');
   const optSurveys = document.getElementById('opt-surveys');
+  const optNotifications = document.getElementById('opt-notifications');
   const enterpriseStatus = document.getElementById('enterpriseStatus');
 
   const auditCountVal = document.getElementById('auditCountVal');
@@ -122,8 +123,31 @@ document.addEventListener('DOMContentLoaded', () => {
     dynamicCspHardening: optCspHardening,
     restoreScroll: optScroll,
     stopAutoplay: optAutoplay,
-    blockSurveys: optSurveys
+    blockSurveys: optSurveys,
+    blockNotifications: optNotifications
   };
+
+  const PAM_PROTECTED_TOGGLES = new Set([
+    'blockSessionSpies',
+    'auditLogging',
+    'antiTamperDlp',
+    'blockWebRtcLeak',
+    'blockPhishingSpoofs',
+    'clipboardDlp',
+    'declarativeSupplyChain',
+    'dynamicCspHardening',
+    'webAuthnAdminLock'
+  ]);
+
+  const DEFAULT_SCHEMA_KEYS = [
+    'blockCookies', 'blockNewsletters', 'blockChats', 'restoreScroll',
+    'stopAutoplay', 'blockNotifications', 'blockSurveys', 'unblurContent',
+    'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
+    'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
+    'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp',
+    'siemForwarding', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'siemBatchSize',
+    'webAuthnAdminLock', 'declarativeSupplyChain', 'dynamicCspHardening', 'cspMode'
+  ];
 
   const whitelistInput = document.getElementById('whitelistInput');
   const addWhitelistBtn = document.getElementById('addWhitelistBtn');
@@ -261,63 +285,69 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ settings: currentSettings });
   }
 
-  if (optDeclarativeSupplyChain) {
-    optDeclarativeSupplyChain.addEventListener('change', () => {
-      currentSettings.declarativeSupplyChain = optDeclarativeSupplyChain.checked;
-      saveSettings();
-      loadDeclarativeDiagnostics();
-    });
-  }
+  Object.keys(optMap).forEach((key) => {
+    const el = optMap[key];
+    if (!el) return;
 
-  if (optCspHardening) {
-    optCspHardening.addEventListener('change', () => {
-      currentSettings.dynamicCspHardening = optCspHardening.checked;
+    el.addEventListener('change', async () => {
+      const nextVal = el.checked;
+
+      // Require PAM step-up verification when disabling security shields or admin lock
+      if (!nextVal && PAM_PROTECTED_TOGGLES.has(key)) {
+        const authorized = await verifyAdminStepUp();
+        if (!authorized) {
+          el.checked = true;
+          return;
+        }
+      }
+
+      currentSettings[key] = nextVal;
       saveSettings();
-      loadDeclarativeDiagnostics();
+
+      if (key === 'webAuthnAdminLock') {
+        updatePamStatus();
+        showPamAlert(
+          nextVal
+            ? 'Biometric Privileged Access Management enabled.'
+            : 'Biometric Privileged Access Management disabled.',
+          nextVal ? 'success' : 'info'
+        );
+      } else if (key === 'siemForwarding') {
+        loadSiemDiagnostics();
+      } else if (key === 'declarativeSupplyChain' || key === 'dynamicCspHardening') {
+        loadDeclarativeDiagnostics();
+      }
     });
-  }
+  });
 
   if (optCspMode) {
-    optCspMode.addEventListener('change', () => {
+    optCspMode.addEventListener('change', async () => {
+      const prevMode = currentSettings.cspMode || 'standard';
+      if (prevMode === 'strict' && optCspMode.value !== 'strict') {
+        const authorized = await verifyAdminStepUp();
+        if (!authorized) {
+          optCspMode.value = prevMode;
+          return;
+        }
+      }
       currentSettings.cspMode = optCspMode.value;
       saveSettings();
       loadDeclarativeDiagnostics();
     });
   }
 
-  if (optWebAuthnPam) {
-    optWebAuthnPam.addEventListener('change', async () => {
-      if (optWebAuthnPam.checked) {
-        currentSettings.webAuthnAdminLock = true;
-        saveSettings();
-        updatePamStatus();
-        showPamAlert('Biometric Privileged Access Management enabled.', 'success');
-      } else {
+  if (optWebRtcMode) {
+    optWebRtcMode.addEventListener('change', async () => {
+      const prevMode = currentSettings.webRtcPolicyMode || 'default_public_interface_only';
+      if (prevMode === 'disable_non_proxied_udp' && optWebRtcMode.value !== 'disable_non_proxied_udp') {
         const authorized = await verifyAdminStepUp();
-        if (authorized) {
-          currentSettings.webAuthnAdminLock = false;
-          saveSettings();
-          updatePamStatus();
-          showPamAlert('Biometric Privileged Access Management disabled.', 'info');
-        } else {
-          optWebAuthnPam.checked = true;
+        if (!authorized) {
+          optWebRtcMode.value = prevMode;
+          return;
         }
       }
-    });
-  }
-
-  if (optWebRtcMode) {
-    optWebRtcMode.addEventListener('change', () => {
       currentSettings.webRtcPolicyMode = optWebRtcMode.value;
       saveSettings();
-    });
-  }
-
-  if (optSiemForwarding) {
-    optSiemForwarding.addEventListener('change', () => {
-      currentSettings.siemForwarding = optSiemForwarding.checked;
-      saveSettings();
-      loadSiemDiagnostics();
     });
   }
 
@@ -349,21 +379,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  optCookies.addEventListener('change', () => { currentSettings.blockCookies = optCookies.checked; saveSettings(); });
-  optNewsletters.addEventListener('change', () => { currentSettings.blockNewsletters = optNewsletters.checked; saveSettings(); });
-  optChats.addEventListener('change', () => { currentSettings.blockChats = optChats.checked; saveSettings(); });
-  if (optUnblur) optUnblur.addEventListener('change', () => { currentSettings.unblurContent = optUnblur.checked; saveSettings(); });
-  if (optAntiAdblock) optAntiAdblock.addEventListener('change', () => { currentSettings.blockAntiAdblock = optAntiAdblock.checked; saveSettings(); });
-  if (optLoginWalls) optLoginWalls.addEventListener('change', () => { currentSettings.blockLoginWalls = optLoginWalls.checked; saveSettings(); });
-  if (optCopy) optCopy.addEventListener('change', () => { currentSettings.unlockCopy = optCopy.checked; saveSettings(); });
-  if (optCleanUrls) optCleanUrls.addEventListener('change', () => { currentSettings.cleanUrls = optCleanUrls.checked; saveSettings(); });
-  if (optViewport) optViewport.addEventListener('change', () => { currentSettings.reclaimViewport = optViewport.checked; saveSettings(); });
-  if (optSessionSpies) optSessionSpies.addEventListener('change', () => { currentSettings.blockSessionSpies = optSessionSpies.checked; saveSettings(); });
-  if (optAudit) optAudit.addEventListener('change', () => { currentSettings.auditLogging = optAudit.checked; saveSettings(); });
-  optScroll.addEventListener('change', () => { currentSettings.restoreScroll = optScroll.checked; saveSettings(); });
-  optAutoplay.addEventListener('change', () => { currentSettings.stopAutoplay = optAutoplay.checked; saveSettings(); });
-  optSurveys.addEventListener('change', () => { currentSettings.blockSurveys = optSurveys.checked; saveSettings(); });
-
   // Whitelist Manager
   function renderWhitelist() {
     whitelistUl.innerHTML = '';
@@ -394,7 +409,9 @@ document.addEventListener('DOMContentLoaded', () => {
         delBtn.className = 'delete-btn';
         delBtn.title = 'Remove';
         delBtn.textContent = '×';
-        delBtn.addEventListener('click', () => {
+        delBtn.addEventListener('click', async () => {
+          const authorized = await verifyAdminStepUp();
+          if (!authorized) return;
           currentSettings.whitelistedDomains = currentSettings.whitelistedDomains.filter(d => d !== domain);
           saveSettings();
           renderWhitelist();
@@ -407,10 +424,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  addWhitelistBtn.addEventListener('click', () => {
+  addWhitelistBtn.addEventListener('click', async () => {
     const raw = whitelistInput.value.trim().toLowerCase();
     const domain = raw.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
     if (domain && !currentSettings.whitelistedDomains.includes(domain)) {
+      const authorized = await verifyAdminStepUp();
+      if (!authorized) return;
       currentSettings.whitelistedDomains.push(domain);
       saveSettings();
       renderWhitelist();
@@ -450,7 +469,9 @@ document.addEventListener('DOMContentLoaded', () => {
       delBtn.className = 'delete-btn';
       delBtn.title = 'Delete';
       delBtn.textContent = '×';
-      delBtn.addEventListener('click', () => {
+      delBtn.addEventListener('click', async () => {
+        const authorized = await verifyAdminStepUp();
+        if (!authorized) return;
         currentSettings.customSelectors.splice(idx, 1);
         saveSettings();
         renderCustomRules();
@@ -462,10 +483,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  addRuleBtn.addEventListener('click', () => {
+  addRuleBtn.addEventListener('click', async () => {
     const domain = ruleDomainInput.value.trim().toLowerCase();
     const selector = ruleSelectorInput.value.trim();
     if (!selector) return;
+
+    const authorized = await verifyAdminStepUp();
+    if (!authorized) return;
 
     if (!currentSettings.customSelectors) {
       currentSettings.customSelectors = [];
@@ -489,7 +513,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Import JSON
-  importBtn.addEventListener('click', () => {
+  importBtn.addEventListener('click', async () => {
+    const authorized = await verifyAdminStepUp();
+    if (!authorized) return;
     importFileInput.click();
   });
 
@@ -497,8 +523,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
+        const authorized = await verifyAdminStepUp();
+        if (!authorized) return;
         const imported = JSON.parse(event.target.result);
         currentSettings = Object.assign(currentSettings, imported);
         saveSettings();
@@ -728,15 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadGpoRegBtn.addEventListener('click', () => {
       chrome.runtime.sendMessage({ action: 'getEnterpriseDiagnostics' }, (res) => {
         const extId = (res && res.extensionId) ? res.extensionId : 'EXTENSION_ID_HERE';
-        const schemaKeys = (res && res.schemaKeys) ? res.schemaKeys : [
-          'blockCookies', 'blockNewsletters', 'blockChats', 'restoreScroll',
-          'stopAutoplay', 'blockNotifications', 'blockSurveys', 'unblurContent',
-          'unlockCopy', 'cleanUrls', 'blockAntiAdblock', 'blockLoginWalls',
-          'reclaimViewport', 'blockSessionSpies', 'auditLogging', 'antiTamperDlp',
-          'blockWebRtcLeak', 'webRtcPolicyMode', 'blockPhishingSpoofs', 'clipboardDlp',
-          'siemForwarding', 'siemEndpoint', 'siemAuthHeader', 'siemFormat', 'siemBatchSize',
-          'webAuthnAdminLock'
-        ];
+        const schemaKeys = (res && res.schemaKeys) ? res.schemaKeys : DEFAULT_SCHEMA_KEYS;
 
         let regContent = 'Windows Registry Editor Version 5.00\r\n\r\n';
         regContent += `; BrowseClean Enterprise Policy Template\r\n`;
@@ -771,7 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (downloadGoogleAdminJsonBtn) {
     downloadGoogleAdminJsonBtn.addEventListener('click', () => {
       chrome.runtime.sendMessage({ action: 'getEnterpriseDiagnostics' }, (res) => {
-        const schemaKeys = (res && res.schemaKeys) ? res.schemaKeys : [];
+        const schemaKeys = (res && res.schemaKeys) ? res.schemaKeys : DEFAULT_SCHEMA_KEYS;
         const policyPayload = {};
         schemaKeys.forEach(k => {
           if (k === 'cspMode') {
