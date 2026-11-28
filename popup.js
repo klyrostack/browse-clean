@@ -31,7 +31,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleScroll = document.getElementById('toggleScroll');
   const toggleAutoplay = document.getElementById('toggleAutoplay');
   const toggleSurveys = document.getElementById('toggleSurveys');
+  const toggleNotifications = document.getElementById('toggleNotifications');
+  const toggleDeclarativeSupplyChain = document.getElementById('toggleDeclarativeSupplyChain');
+  const toggleCspHardening = document.getElementById('toggleCspHardening');
   const enterpriseBanner = document.getElementById('enterpriseBanner');
+
+  const PAM_PROTECTED_KEYS = new Set([
+    'blockSessionSpies',
+    'auditLogging',
+    'antiTamperDlp',
+    'blockWebRtcLeak',
+    'blockPhishingSpoofs',
+    'clipboardDlp',
+    'declarativeSupplyChain',
+    'dynamicCspHardening'
+  ]);
 
   const toggleMap = {
     blockCookies: toggleCookies,
@@ -49,9 +63,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     blockWebRtcLeak: toggleWebRtc,
     blockPhishingSpoofs: togglePhishing,
     clipboardDlp: toggleClipboardDlp,
+    declarativeSupplyChain: toggleDeclarativeSupplyChain,
+    dynamicCspHardening: toggleCspHardening,
     restoreScroll: toggleScroll,
     stopAutoplay: toggleAutoplay,
-    blockSurveys: toggleSurveys
+    blockSurveys: toggleSurveys,
+    blockNotifications: toggleNotifications
   };
 
   let activeTab = null;
@@ -76,6 +93,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     blockWebRtcLeak: true,
     blockPhishingSpoofs: true,
     clipboardDlp: true,
+    declarativeSupplyChain: true,
+    dynamicCspHardening: true,
+    cspMode: 'standard',
+    webAuthnAdminLock: false,
     whitelistedDomains: [],
     customSelectors: []
   };
@@ -119,12 +140,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       const el = toggleMap[key];
       if (el) {
         el.checked = !!activeSettings[key];
-        if (lockedKeys.includes(key)) {
+        const isEnterpriseLocked = lockedKeys.includes(key);
+        const isPamLocked = !!activeSettings.webAuthnAdminLock && PAM_PROTECTED_KEYS.has(key);
+        if (isEnterpriseLocked || isPamLocked) {
           el.disabled = true;
           const row = el.closest('.filter-row');
           if (row) {
             row.classList.add('locked');
-            row.title = 'Enforced by organization policy';
+            row.title = isEnterpriseLocked
+              ? 'Enforced by organization policy'
+              : 'Protected by Admin PAM Lock — modify in Settings';
           }
         }
       }
@@ -134,10 +159,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     siteToggle.checked = !isWhitelisted;
     renderStatusBadge(!isWhitelisted);
 
-    if (lockedKeys.includes('whitelistedDomains') || (isManaged && isWhitelisted)) {
+    if (lockedKeys.includes('whitelistedDomains') || (isManaged && isWhitelisted) || activeSettings.webAuthnAdminLock) {
       siteToggle.disabled = true;
       const domainCard = siteToggle.closest('.domain-card');
-      if (domainCard) domainCard.title = 'Domain exemption enforced by organization policy';
+      if (domainCard) {
+        domainCard.title = activeSettings.webAuthnAdminLock && !isManaged
+          ? 'Protected by Admin PAM Lock — modify in Settings'
+          : 'Domain exemption enforced by organization policy';
+      }
     }
   });
 
@@ -208,20 +237,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Module switches
-  toggleCookies.addEventListener('change', () => { activeSettings.blockCookies = toggleCookies.checked; persistSettings(); });
-  toggleNewsletters.addEventListener('change', () => { activeSettings.blockNewsletters = toggleNewsletters.checked; persistSettings(); });
-  toggleChats.addEventListener('change', () => { activeSettings.blockChats = toggleChats.checked; persistSettings(); });
-  toggleUnblur.addEventListener('change', () => { activeSettings.unblurContent = toggleUnblur.checked; persistSettings(); });
-  if (toggleAntiAdblock) toggleAntiAdblock.addEventListener('change', () => { activeSettings.blockAntiAdblock = toggleAntiAdblock.checked; persistSettings(); });
-  if (toggleLoginWalls) toggleLoginWalls.addEventListener('change', () => { activeSettings.blockLoginWalls = toggleLoginWalls.checked; persistSettings(); });
-  toggleCopy.addEventListener('change', () => { activeSettings.unlockCopy = toggleCopy.checked; persistSettings(); });
-  toggleCleanUrls.addEventListener('change', () => { activeSettings.cleanUrls = toggleCleanUrls.checked; persistSettings(); });
-  if (toggleViewport) toggleViewport.addEventListener('change', () => { activeSettings.reclaimViewport = toggleViewport.checked; persistSettings(); });
-  if (toggleSessionSpies) toggleSessionSpies.addEventListener('change', () => { activeSettings.blockSessionSpies = toggleSessionSpies.checked; persistSettings(); });
-  if (toggleAudit) toggleAudit.addEventListener('change', () => { activeSettings.auditLogging = toggleAudit.checked; persistSettings(); });
-  toggleScroll.addEventListener('change', () => { activeSettings.restoreScroll = toggleScroll.checked; persistSettings(); });
-  toggleAutoplay.addEventListener('change', () => { activeSettings.stopAutoplay = toggleAutoplay.checked; persistSettings(); });
-  toggleSurveys.addEventListener('change', () => { activeSettings.blockSurveys = toggleSurveys.checked; persistSettings(); });
+  Object.keys(toggleMap).forEach((key) => {
+    const el = toggleMap[key];
+    if (!el) return;
+    el.addEventListener('change', () => {
+      activeSettings[key] = el.checked;
+      persistSettings();
+    });
+  });
 
   // Manual Sweep
   manualSweepBtn.addEventListener('click', () => {
