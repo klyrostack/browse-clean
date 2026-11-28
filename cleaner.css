@@ -149,7 +149,13 @@ div[id*="sleeknote" i],
 div[class*="newsletter-modal" i],
 div[class*="subscribe-modal" i],
 div[id*="newsletter-popup" i],
-div[class*="email-signup" i][style*="fixed"] {
+div[class*="email-signup" i][style*="fixed"],
+#onesignal-slidedown-container,
+.onesignal-slidedown-container,
+#onesignal-bell-container,
+.onesignal-bell-container,
+.webpush-prompt,
+div[class*="notification-prompt" i] {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
